@@ -1,0 +1,64 @@
+/* ── Goblin Theme ─── */
+.theme-goblin {
+  --c-bg:        #0d1a0e;
+  --c-bg2:       #111f12;
+  --c-surface:   #1d3320;
+  --c-accent:    #3ddc5a;
+  --c-accent2:   #b8f03c;
+  --c-text:      #d4f0d7;
+  --c-text-muted:#7aab80;
+  --c-bar:       #152018;
+  --c-bar-fill:  #3ddc5a;
+}
+.theme-goblin .room-bg {
+  background: radial-gradient(ellipse at bottom, #1a3d1e 0%, #0d1a0e 70%);
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='15' cy='45' r='3' fill='%2322441a' opacity='0.4'/%3E%3Ccircle cx='40' cy='20' r='2' fill='%2222441a' opacity='0.3'/%3E%3C/svg%3E");
+}
+.theme-goblin .game-title { color: #3ddc5a; }
+
+/* ── Human Theme ─── */
+.theme-human {
+  --c-bg:        #1c1406;
+  --c-bg2:       #231a08;
+  --c-surface:   #3d2e12;
+  --c-accent:    #e8a020;
+  --c-accent2:   #f5d060;
+  --c-text:      #f5e8d0;
+  --c-text-muted:#c0a070;
+  --c-bar:       #2a2008;
+  --c-bar-fill:  #e8a020;
+}
+.theme-human .room-bg {
+  background: radial-gradient(ellipse at bottom, #3d2e12 0%, #1c1406 70%);
+}
+.theme-human .game-title { color: #e8a020; }
+
+/* ── Elf Theme ─── */
+.theme-elf {
+  --c-bg:        #030d1c;
+  --c-bg2:       #06132a;
+  --c-surface:   #0e2444;
+  --c-accent:    #5ab4f5;
+  --c-accent2:   #a8d8ff;
+  --c-text:      #d0eaff;
+  --c-text-muted:#6090b8;
+  --c-bar:       #071428;
+  --c-bar-fill:  #5ab4f5;
+}
+.theme-elf .room-bg {
+  background: radial-gradient(ellipse at top, #0e2444 0%, #030d1c 70%);
+}
+.theme-elf .game-title { color: #5ab4f5; }
+
+/* ── Neutral (race select screen) ─── */
+.theme-neutral {
+  --c-bg:        #0f0f1a;
+  --c-bg2:       #13131f;
+  --c-surface:   #1e1e32;
+  --c-accent:    #7c5cbf;
+  --c-accent2:   #c9a0ff;
+  --c-text:      #e8e0f0;
+  --c-text-muted:#8878a8;
+  --c-bar:       #191928;
+  --c-bar-fill:  #7c5cbf;
+}

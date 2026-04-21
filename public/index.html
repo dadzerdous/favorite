@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tamapets — Choose Your Race</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/themes.css">
+</head>
+<body class="theme-neutral">
+
+  <!-- ── Screen: Race Select ──────────────────────────────────────────── -->
+  <div id="screen-race" class="screen active">
+    <div class="title-card">
+      <h1 class="game-title">✦ TAMAPETS ✦</h1>
+      <p class="game-subtitle">Choose your creature</p>
+    </div>
+    <div class="race-grid">
+      <button class="race-card" data-race="goblin">
+        <div class="race-avatar">🟢</div>
+        <div class="race-name">Goblin</div>
+        <div class="race-desc">Scrappy & cunning. Eats rats,<br>drinks swamp brew, loves gold.</div>
+        <div class="race-tag">Chaos Mode</div>
+      </button>
+      <button class="race-card" data-race="human">
+        <div class="race-avatar">🟡</div>
+        <div class="race-name">Human</div>
+        <div class="race-desc">Balanced & adaptable. Eats bread,<br>drinks ale, collects trinkets.</div>
+        <div class="race-tag">Classic Mode</div>
+      </button>
+      <button class="race-card" data-race="elf">
+        <div class="race-avatar">🔵</div>
+        <div class="race-name">Elf</div>
+        <div class="race-desc">Elegant & ancient. Drinks fine wine,<br>eats moonberries, collects lore.</div>
+        <div class="race-tag">Prestige Mode</div>
+      </button>
+    </div>
+    <div class="name-form">
+      <input type="text" id="player-name" placeholder="Enter your name..." maxlength="16">
+      <button id="btn-start-game" class="btn-primary" disabled>Begin Journey</button>
+    </div>
+  </div>
+
+  <!-- ── Screen: Main Game ─────────────────────────────────────────────── -->
+  <div id="screen-game" class="screen">
+    <header class="game-header">
+      <div class="header-left">
+        <span id="hdr-name" class="hdr-name"></span>
+        <span id="hdr-race" class="hdr-race badge"></span>
+      </div>
+      <div class="header-right">
+        <span class="coin-display">💰 <span id="hdr-coins">0</span></span>
+        <button id="btn-open-lobby" class="btn-sm">⚔ Multiplayer</button>
+      </div>
+    </header>
+
+    <div class="game-layout">
+      <!-- Pet Room -->
+      <div class="pet-room" id="pet-room">
+        <div class="room-bg"></div>
+        <div class="pet-sprite" id="pet-sprite"></div>
+        <div class="pet-speech" id="pet-speech"></div>
+        <div class="room-items" id="room-items"></div>
+      </div>
+
+      <!-- Stats Panel -->
+      <div class="stats-panel">
+        <div class="stat-row">
+          <span class="stat-label">🍖 Hunger</span>
+          <div class="stat-bar"><div class="stat-fill" id="bar-hunger"></div></div>
+          <span class="stat-val" id="val-hunger">80</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">🎮 Happy</span>
+          <div class="stat-bar"><div class="stat-fill" id="bar-happy"></div></div>
+          <span class="stat-val" id="val-happy">80</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">⚡ Energy</span>
+          <div class="stat-bar"><div class="stat-fill" id="bar-energy"></div></div>
+          <span class="stat-val" id="val-energy">80</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">✨ XP</span>
+          <div class="stat-bar"><div class="stat-fill xp-fill" id="bar-xp"></div></div>
+          <span class="stat-val" id="val-xp">0</span>
+        </div>
+      </div>
+
+      <!-- Action Bar -->
+      <div class="action-bar">
+        <button class="action-btn" id="btn-feed" title="Feed">
+          <span class="action-icon" id="feed-icon">🍖</span>
+          <span class="action-label">Feed</span>
+        </button>
+        <button class="action-btn" id="btn-play" title="Play">
+          <span class="action-icon">🎮</span>
+          <span class="action-label">Play</span>
+        </button>
+        <button class="action-btn" id="btn-shop" title="Shop">
+          <span class="action-icon">🛒</span>
+          <span class="action-label">Shop</span>
+        </button>
+        <button class="action-btn" id="btn-sleep" title="Sleep">
+          <span class="action-icon">💤</span>
+          <span class="action-label">Sleep</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modal: Feed Minigame ──────────────────────────────────────────── -->
+  <div id="modal-feed" class="modal hidden">
+    <div class="modal-box">
+      <h2 class="modal-title" id="feed-game-title">🍖 Feeding Time!</h2>
+      <p class="modal-hint">Click the food before it falls!</p>
+      <div id="feed-arena" class="minigame-arena">
+        <canvas id="feed-canvas" width="340" height="300"></canvas>
+      </div>
+      <div class="minigame-hud">
+        <span>Score: <strong id="feed-score">0</strong></span>
+        <span>Time: <strong id="feed-timer">10</strong>s</span>
+        <span>Streak: <strong id="feed-streak">0</strong>🔥</span>
+      </div>
+      <button id="feed-start-btn" class="btn-primary">Start!</button>
+      <button id="feed-close-btn" class="btn-ghost">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ── Modal: Play Minigame ──────────────────────────────────────────── -->
+  <div id="modal-play" class="modal hidden">
+    <div class="modal-box">
+      <h2 class="modal-title">🎮 Reaction Rush!</h2>
+      <p class="modal-hint">Tap the glowing target as fast as you can!</p>
+      <div id="play-arena" class="minigame-arena">
+        <canvas id="play-canvas" width="340" height="300"></canvas>
+      </div>
+      <div class="minigame-hud">
+        <span>Score: <strong id="play-score">0</strong></span>
+        <span>Time: <strong id="play-timer">15</strong>s</span>
+        <span>Best: <strong id="play-best">0</strong>ms</span>
+      </div>
+      <button id="play-start-btn" class="btn-primary">Start!</button>
+      <button id="play-close-btn" class="btn-ghost">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ── Modal: Shop ───────────────────────────────────────────────────── -->
+  <div id="modal-shop" class="modal hidden">
+    <div class="modal-box wide">
+      <h2 class="modal-title" id="shop-title">🛒 The Market</h2>
+      <p class="modal-coins">Your coins: <strong id="shop-coins">0</strong> 💰</p>
+      <div id="shop-grid" class="shop-grid"></div>
+      <button id="shop-close-btn" class="btn-ghost">Close</button>
+    </div>
+  </div>
+
+  <!-- ── Modal: Multiplayer Lobby ──────────────────────────────────────── -->
+  <div id="modal-lobby" class="modal hidden">
+    <div class="modal-box wide">
+      <h2 class="modal-title">⚔ Multiplayer Lobby</h2>
+
+      <div id="lobby-setup" class="lobby-section">
+        <div class="lobby-game-pick">
+          <label>Minigame:</label>
+          <select id="lobby-game-type">
+            <option value="feed">Feeding Frenzy</option>
+            <option value="play">Reaction Rush</option>
+          </select>
+        </div>
+        <div class="lobby-actions">
+          <button id="btn-create-lobby" class="btn-primary">Create Lobby</button>
+          <div class="or-divider">— or —</div>
+          <div class="join-row">
+            <input type="text" id="join-code" placeholder="Enter code..." maxlength="6" style="text-transform:uppercase">
+            <button id="btn-join-lobby" class="btn-secondary">Join</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="lobby-room" class="lobby-section hidden">
+        <div class="lobby-code-display">
+          Code: <strong id="lobby-code-show"></strong>
+          <button id="btn-copy-code" class="btn-xs">Copy</button>
+        </div>
+        <div id="lobby-player-list" class="player-list"></div>
+        <div id="lobby-status" class="lobby-status">Waiting for players...</div>
+        <div class="lobby-btns">
+          <button id="btn-lobby-start" class="btn-primary hidden">▶ Start Game</button>
+          <button id="btn-lobby-leave" class="btn-ghost">Leave</button>
+        </div>
+      </div>
+
+      <div id="lobby-results" class="lobby-section hidden">
+        <h3>Results</h3>
+        <div id="results-list" class="results-list"></div>
+        <div id="reward-banner" class="reward-banner"></div>
+        <div class="lobby-btns">
+          <button id="btn-results-lobby" class="btn-secondary hidden">Back to Lobby</button>
+          <button id="btn-results-close" class="btn-ghost">Close</button>
+        </div>
+      </div>
+
+      <button id="lobby-close-btn" class="btn-ghost modal-close-x">✕</button>
+    </div>
+  </div>
+
+  <!-- ── Toast ─────────────────────────────────────────────────────────── -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
