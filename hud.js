@@ -69,12 +69,12 @@ function drawSkillMenu() {
 
     // Name
     const nameKnown=item.name!=='???';
-    ctx.fillStyle=bought?'#a78bfa':nameKnown&&canAfford?'#fff':'rgba(255,255,255,0.35)';
+    ctx.fillStyle=bought?'#a78bfa':nameKnown&&canAfford?'#fff':'rgba(255,200,200,0.6)';
     ctx.font=`${isHov?'bold ':''}12px Courier New`; ctx.textAlign='left';
     ctx.fillText(item.name, listX+12, iy+16);
 
     // Desc
-    ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='10px Courier New';
+    ctx.fillStyle='rgba(200,200,255,0.75)'; ctx.font='10px Courier New';
     ctx.fillText(bought&&item.desc!=='...' ? item.desc : nameKnown?item.desc:'???', listX+12, iy+30);
 
     // Right side: cost or status
@@ -104,7 +104,7 @@ function drawSkillMenu() {
   // Controls
   ctx.fillStyle='rgba(255,255,255,0.22)'; ctx.font='10px Courier New'; ctx.textAlign='center';
   ctx.fillText('↑↓ select  ·  ←→ switch tab  ·  Enter/tap to buy  ·  C to continue', cx, cy+122);
-  ctx.fillStyle='rgba(255,160,60,0.75)'; ctx.font='bold 11px Courier New';
+  ctx.fillStyle='#ffa040'; ctx.font='bold 11px Courier New';
   ctx.fillText('[ Continue Journey ]', cx, cy+140);
 
   ctx.restore();
@@ -192,9 +192,51 @@ function drawHome(ts) {
 
   // Controls hint
   ctx.save();
-  ctx.fillStyle='rgba(255,255,255,0.2)'; ctx.font='10px Courier New'; ctx.textAlign='center';
+  ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='10px Courier New'; ctx.textAlign='center';
   ctx.fillText('↑↓ or tap  ·  Enter to select', cx, cy+128);
   ctx.restore();
+
+  // New Game confirm dialog — drawn on top of home screen
+  if(newGameConfirmOpen){
+    // Dark overlay
+    ctx.save();
+    ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // Dialog box
+    const dw=260, dh=110, dx=cx-dw/2, dy=cy-dh/2+20;
+    ctx.fillStyle='#1a0d30';
+    ctx.beginPath(); ctx.roundRect(dx,dy,dw,dh,10); ctx.fill();
+    ctx.strokeStyle='rgba(255,214,107,0.6)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.roundRect(dx,dy,dw,dh,10); ctx.stroke();
+
+    ctx.fillStyle='#fff'; ctx.font='bold 13px Courier New'; ctx.textAlign='center';
+    ctx.fillText('Reset everything?', cx, dy+28);
+    ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='10px Courier New';
+    ctx.fillText('Score, SP, skills and unlocks', cx, dy+46);
+    ctx.fillText('will all be wiped.', cx, dy+60);
+
+    // YES / NO buttons
+    const bw=90, bh=28, gap=14;
+    const yesBX=cx-gap/2-bw, noBX=cx+gap/2, btnY=dy+76;
+
+    ctx.fillStyle='rgba(255,80,80,0.25)';
+    ctx.beginPath(); ctx.roundRect(yesBX,btnY,bw,bh,6); ctx.fill();
+    ctx.strokeStyle='rgba(255,80,80,0.7)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.roundRect(yesBX,btnY,bw,bh,6); ctx.stroke();
+    ctx.fillStyle='#ff8888'; ctx.font='bold 12px Courier New';
+    ctx.fillText('YES', yesBX+bw/2, btnY+bh/2+4);
+
+    ctx.fillStyle='rgba(100,255,100,0.2)';
+    ctx.beginPath(); ctx.roundRect(noBX,btnY,bw,bh,6); ctx.fill();
+    ctx.strokeStyle='rgba(100,255,100,0.6)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.roundRect(noBX,btnY,bw,bh,6); ctx.stroke();
+    ctx.fillStyle='#88ff88'; ctx.font='bold 12px Courier New';
+    ctx.fillText('NO', noBX+bw/2, btnY+bh/2+4);
+
+    ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='9px Courier New';
+    ctx.fillText('Y / Enter = yes   ·   N / Esc = no', cx, dy+dh+14);
+    ctx.restore();
+  }
 }
 
 function drawHowToPlay() {
@@ -210,7 +252,7 @@ function drawHowToPlay() {
   ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='bold 36px Courier New';
   ctx.fillText('SURVIVE', cx, cy+6);
 
-  ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.font='11px Courier New';
+  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='11px Courier New';
   ctx.fillText('Tap  /  Enter to go back', cx, cy+60);
   ctx.restore();
 }
@@ -251,7 +293,7 @@ function drawProgressBar() {
   }
 
   // Start marker
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.beginPath(); ctx.arc(trackX0, trackY, 2.5, 0, Math.PI*2); ctx.fill();
 
   // End marker
@@ -283,7 +325,7 @@ function drawHUD(ts) {
 
   // Chapter label (top left) — no spoilers, just the chapter number
   ctx.save();
-  ctx.fillStyle='rgba(180,150,255,0.55)'; ctx.font='12px Courier New'; ctx.textAlign='left';
+  ctx.fillStyle='rgba(200,180,255,0.85)'; ctx.font='12px Courier New'; ctx.textAlign='left';
   const chLabel = chapter===CHAPTER.ONE ? 'Chapter I' :
                   chapter===CHAPTER.TWO ? 'Chapter II' :
                   chapter===CHAPTER.THREE ? 'Chapter III' : 'Chapter IV';
@@ -293,7 +335,7 @@ function drawHUD(ts) {
   // Skill points — always visible, even at 0.
   // Design intent: showing 0 creates aspiration; player knows what they're working toward.
   ctx.save();
-  ctx.fillStyle = skillPoints>0 ? 'rgba(167,139,250,0.9)' : 'rgba(167,139,250,0.35)';
+  ctx.fillStyle = skillPoints>0 ? '#c4b5fd' : 'rgba(167,139,250,0.65)';
   ctx.font='11px Courier New'; ctx.textAlign='left';
   ctx.fillText(`SP: ${skillPoints}`, 16, 48);
   ctx.restore();
@@ -368,7 +410,7 @@ function drawGameOver() {
     ctx.fillStyle = isNew ? '#a78bfa' : 'rgba(180,160,255,0.6)';
     ctx.font='11px Courier New';
     ctx.fillText(isNew ? `★ NEW BEST: ${Math.floor(highScore)}` : `Best: ${Math.floor(highScore)}`, cx, topY+44);
-    ctx.fillStyle='rgba(200,200,255,0.4)';
+    ctx.fillStyle='rgba(200,200,255,0.85)';
     ctx.fillText(`All-time: ${Math.floor(totalScore)}`, cx, topY+58);
 
     // ── Action buttons: CONTINUE | RESTART | HOME ──
@@ -389,9 +431,9 @@ function drawGameOver() {
       ctx.font=`${isHov?'bold ':''}11px Courier New`; ctx.textAlign='center';
       ctx.fillText(label, bx+btnW/2, by+btnH/2+4);
     });
-    ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.font='10px Courier New'; ctx.textAlign='center';
+    ctx.fillStyle='rgba(255,220,120,0.85)'; ctx.font='10px Courier New'; ctx.textAlign='center';
     ctx.fillText(subtitles[homeMenuCursor]||'', cx, btnY+btnH+14);
-    ctx.fillStyle='rgba(255,255,255,0.15)';
+    ctx.fillStyle='rgba(255,255,255,0.65)';
     ctx.fillText('← → select  ·  tap or Enter to confirm', cx, btnY+btnH+26);
 
     // ── Skill menu embedded below ──
@@ -436,9 +478,11 @@ function drawGameOver() {
       ctx.strokeStyle=isHov?'rgba(167,139,250,0.6)':'rgba(255,255,255,0.07)';
       ctx.lineWidth=isHov?1.5:1;
       ctx.beginPath(); ctx.roundRect(listX,iy,listW,rowH-3,4); ctx.stroke();
-      ctx.fillStyle=bought?'#a78bfa':canAfford?'#fff':'rgba(255,255,255,0.3)';
+      const shieldLocked = menuTab===0 && item.id==='shield_str' && !hasUnlock('shield');
+      ctx.fillStyle = shieldLocked ? 'rgba(255,255,255,0.2)' :
+                      bought?'#a78bfa':canAfford?'#fff':'rgba(255,255,255,0.3)';
       ctx.font=`${isHov?'bold ':''}11px Courier New`; ctx.textAlign='left';
-      ctx.fillText(item.name, listX+10, iy+rowH/2+4);
+      ctx.fillText((shieldLocked?'🔒 ':'')+item.name, listX+10, iy+rowH/2+4);
       ctx.textAlign='right';
       if(menuTab===0){
         ctx.fillStyle=item.stacks>0?'rgba(167,139,250,0.8)':canAfford?'#ffd66b':'rgba(255,255,255,0.2)';

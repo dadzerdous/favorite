@@ -48,7 +48,8 @@ let score          = 0;
 let homeMenuCursor = 0; // 0=Continue, 1=New Game, 2=How To Play
 let splashDone     = false; // latched after first splash dismiss
 let deathCount     = 0; // tracks if player has died at least once (gates home screen access)
-let howToPlayOpen  = false;
+let howToPlayOpen       = false;
+let newGameConfirmOpen  = false; // 'Are you sure?' overlay on New Game
 let cameraX        = 0;
 let lastTime       = 0;
 

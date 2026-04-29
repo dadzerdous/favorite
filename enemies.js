@@ -6,6 +6,7 @@
 // ══════════════════════════════════════════════════════════════
 const enemies = [];
 let eSpawnTimer = 0;
+let lastSpawnX  = -9999; // world X of last spawned enemy — prevents clustering
 
 // ── Creature roster ────────────────────────────────────────
 // label = internal dispatch key (used in draw switch + update)
@@ -57,12 +58,20 @@ function spawnEnemy() {
   const t = pool[irnd(0, pool.length-1)];
   const spawnX = player.x + canvas.width * 0.65 + rnd(0, 200);
   // Only spawn on ground
-  if (!isGroundAt(spawnX)) return;
   const isSwooper = t.label==='swooper';
+  // Minimum world-space gap between any two enemies.
+  // Prevents clusters that make sections impassable.
+  // Ground and air enemies share the same gap budget.
+  const MIN_ENEMY_GAP = 220;
+  if(spawnX - lastSpawnX < MIN_ENEMY_GAP) return false;
+  if (!isSwooper && !isGroundAt(spawnX)) return false;
   // Swooper spawns at a fixed high canvas Y — independent of player position.
   // It hovers there, then periodically dips toward the player's head level.
   // Using a fixed canvas Y prevents jitter from player vertical movement.
-  const spawnY = isSwooper ? rnd(30, 80) : GY() - t.h/2;
+  // Swooper hovers one full swooper-height above player's head.
+  // Player head = GY() - PH. Spawns t.h above that, so it's clearly in view.
+  // Spawn two full swooper-heights above player head — clearly visible, not cramped
+  const spawnY = isSwooper ? GY() - PH - t.h*2 - rnd(10, 20) : GY() - t.h/2;
   enemies.push({
     x: spawnX,
     y: spawnY,
@@ -79,6 +88,8 @@ function spawnEnemy() {
     baseY: spawnY,               // fixed hover altitude (canvas Y, not world Y)
     nameTimer: 1800,
   });
+  lastSpawnX = spawnX;
+  return true; // successfully spawned
 }
 
 function updateEnemies(dt) {
@@ -86,7 +97,11 @@ function updateEnemies(dt) {
 
   eSpawnTimer += dt;
   const interval = Math.max(1400, 3500 - score * 12);
-  if (eSpawnTimer >= interval) { spawnEnemy(); eSpawnTimer = 0; }
+  if (eSpawnTimer >= interval) {
+    const spawned = spawnEnemy();
+    if(spawned) eSpawnTimer = 0;
+    else eSpawnTimer = interval * 0.6; // retry sooner if spawn was blocked
+  }
 
   const gy = GY();
   for (let i = enemies.length-1; i >= 0; i--) {
@@ -145,13 +160,15 @@ function updateEnemies(dt) {
       }
 
       if(e.swooping){
-        const targetY = player.y - PH/2;  // player head level (dip target)
+        // Target = top of Lester's head. Never goes to ground.
+        // player.y is centre; player.y - PH/2 = top of head.
+        const targetY = Math.min(player.y - PH/2, GY() - e.h - 20);
         if(e.swoopPhase === 'down'){
           e.y += 4.5;   // fast descent
           if(e.y >= targetY){ e.y = targetY; e.swoopPhase = 'hold'; e.swoopHold = 0; }
         } else if(e.swoopPhase === 'hold'){
           e.swoopHold += dt;
-          if(e.swoopHold > 200){ e.swoopPhase = 'up'; } // hold at head level briefly
+          if(e.swoopHold > 700){ e.swoopPhase = 'up'; } // hold at head level — long enough to react
         } else {
           e.y -= 3.0;   // rise back up
           if(e.y <= e.baseY){ e.y = e.baseY; e.swooping = false; e.swoopTimer = rnd(1500,3000); }

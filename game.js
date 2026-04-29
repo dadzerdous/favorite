@@ -351,42 +351,121 @@ function confirmGameOver() {
   }
 }
 
+function fullReset() {
+  // Wipe everything — scores, SP, skills, unlocks.
+  // Called only after explicit confirmation from the New Game dialog.
+  highScore=0; totalScore=0; skillPoints=0;
+  localStorage.removeItem('uh_highscore');
+  localStorage.removeItem('uh_totalscore');
+  localStorage.removeItem('uh_skillpoints');
+  // Reset all skill stacks and costs to defaults
+  SKILLS.forEach(sk=>{ sk.stacks=0; sk.cost=sk.id==='spring'?15:sk.id==='shield_str'?25:sk.cost; });
+  UNLOCKS.forEach(un=>{ un.owned=false; un.active=false; un.stacks=0; });
+  newGameConfirmOpen=false;
+  startChapter(CHAPTER.ONE, true);
+}
+
 function confirmHome() {
+  if(newGameConfirmOpen){ return; } // handled separately by confirmNewGame
   if(howToPlayOpen){ howToPlayOpen=false; return; }
   if(homeMenuCursor===0){
-    // Continue — same chapter as when they died
     startChapter(chapter);
   } else if(homeMenuCursor===1){
-    // New Game — full reset from Ch1
-    startChapter(CHAPTER.ONE, true);
+    // Show confirmation dialog instead of immediately resetting
+    newGameConfirmOpen=true;
   } else {
-    // How To Play
     howToPlayOpen=true;
   }
 }
 
-// Mouse click — mirrors touchstart for desktop users.
-// Extracts clientX/Y and routes through the same menu logic.
+function confirmNewGame(yes) {
+  if(yes) fullReset();
+  else    newGameConfirmOpen=false;
+}
+
+// handlePointer — routes clicks/touches to the correct menu action.
+// IMPORTANT: on the gameover screen, check skill menu zones FIRST before
+// calling confirmGameOver. Any tap that hits a skill slot or tab should
+// buy/navigate, not restart. confirmGameOver only fires if the tap is
+// clearly in the action button row.
 function handlePointer(clientX, clientY) {
   if(gameState==='splash'&&stateTimer>800){ startChapter(CHAPTER.ONE,true); return; }
   if(howToPlayOpen){ howToPlayOpen=false; return; }
 
   if(gameState==='gameover' && stateTimer>700){
-    const rect=canvas.getBoundingClientRect();
-    const ty=clientY - rect.top;
-    const cy=canvas.height/2;
-    // 3 options spaced 32px apart starting at cy+24
-    if     (ty > cy+8  && ty < cy+40)  homeMenuCursor=0;
-    else if(ty > cy+40 && ty < cy+72)  homeMenuCursor=1;
-    else if(ty > cy+72 && ty < cy+104) homeMenuCursor=2;
-    confirmGameOver(); return;
+    const rect = canvas.getBoundingClientRect();
+    // Scale from CSS pixels to canvas pixels
+    const scaleY = canvas.height / rect.height;
+    const scaleX = canvas.width  / rect.width;
+    const cx = canvas.width  / 2;
+    const ty = (clientY - rect.top)  * scaleY;
+    const tx = (clientX - rect.left) * scaleX;
+
+    // ── Skill area zones (drawn in drawGameOver) ──
+    const skillY   = canvas.height * 0.56;
+    const tabY     = skillY + 28;
+    const listStartY = skillY + 58;
+    const rowH     = 32;
+    const listW    = canvas.width * 0.8;
+    const listX    = cx - listW / 2;
+    const tabW=80, tabGap=6, tabTotal=2*(tabW+tabGap)-tabGap;
+    const tabStartX = cx - tabTotal/2;
+
+    // Tab switch
+    if(ty >= tabY && ty <= tabY+22){
+      if(tx >= tabStartX && tx <= tabStartX+tabW){ menuTab=0; skillCursor=0; return; }
+      if(tx >= tabStartX+tabW+tabGap && tx <= tabStartX+tabTotal){ menuTab=1; skillCursor=0; return; }
+    }
+
+    // Skill row buy
+    const items = menuTab===0?SKILLS:UNLOCKS;
+    for(let i=0;i<Math.min(items.length,4);i++){
+      const iy=listStartY+i*rowH;
+      if(ty>=iy && ty<=iy+rowH-3 && tx>=listX && tx<=listX+listW){
+        skillCursor=i; buyItem(i); return;
+      }
+    }
+
+    // ── Action buttons (horizontal, at ~38% down canvas) ──
+    const btnY    = canvas.height * 0.38;
+    const btnH    = 30;
+    const btnW    = 110, btnGap = 10;
+    const btnTotal2 = 3*(btnW+btnGap)-btnGap;
+    const btnStartX = cx - btnTotal2/2;
+    let hitBtn = false;
+    for(let bi=0;bi<3;bi++){
+      const bx=btnStartX+bi*(btnW+btnGap);
+      if(tx>=bx && tx<=bx+btnW && ty>=btnY && ty<=btnY+btnH){
+        homeMenuCursor=bi; hitBtn=true;
+      }
+    }
+    if(hitBtn){ confirmGameOver(); return; }
+
+    // Tap outside all zones — do nothing (don't accidentally restart)
+    return;
   }
+
   if(gameState==='home'){
     const rect=canvas.getBoundingClientRect();
-    const ty=clientY - rect.top;
-    const cy=canvas.height/2;
+    const scaleY=canvas.height/rect.height;
+    const scaleX=canvas.width/rect.width;
+    const ty=(clientY-rect.top)*scaleY;
+    const tx=(clientX-rect.left)*scaleX;
+    const cx2=canvas.width/2, cy2=canvas.height/2;
+
+    // New Game confirm dialog
+    if(newGameConfirmOpen){
+      // YES button: left half of confirm area. NO: right half.
+      const dialogY=cy2+20;
+      if(ty>=dialogY && ty<=dialogY+36){
+        if(tx<cx2) confirmNewGame(true);
+        else       confirmNewGame(false);
+      }
+      return;
+    }
+
     HOME_OPTS.forEach((_,i)=>{
-      const oy=cy-4+i*42;
+      const oy=cy2-4+i*42;
       if(ty>=oy-20 && ty<=oy+14) homeMenuCursor=i;
     });
     confirmHome(); return;
@@ -408,13 +487,17 @@ function buyItem(cursor) {
   if(menuTab === 0){
     const sk = SKILLS[cursor];
     if(!sk) return;
+    // Shield Strength requires Shield unlock to be purchased first
+    if(sk.id==='shield_str' && !hasUnlock('shield')){
+      return; // silently block — UI shows it as locked
+    }
     if(skillPoints < sk.cost) return;
     if(sk.stackable){
       skillPoints -= sk.cost;
       sk.stacks++;
-      sk.cost = Math.round(sk.cost * 1.5); // escalate per stack
+      sk.cost = Math.round(sk.cost * 1.5);
     } else {
-      if(sk.stacks > 0) return; // already bought
+      if(sk.stacks > 0) return;
       skillPoints -= sk.cost;
       sk.stacks = 1;
     }
@@ -476,6 +559,11 @@ document.addEventListener('keydown', e=>{
 
   // Home screen navigation
   if(gameState==='home'){
+    if(newGameConfirmOpen){
+      if(e.key==='Enter'||e.key==='y'||e.key==='Y') confirmNewGame(true);
+      if(e.key==='Escape'||e.key==='n'||e.key==='N') confirmNewGame(false);
+      return;
+    }
     if(e.key==='ArrowDown') homeMenuCursor=(homeMenuCursor+1)%3;
     if(e.key==='ArrowUp')   homeMenuCursor=(homeMenuCursor+2)%3;
     if(e.key==='Enter')     confirmHome();
