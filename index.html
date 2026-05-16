@@ -1,50 +1,114 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>2.0Unlikely Hero</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chinese Restaurant Picker</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Arial, sans-serif;
+      background: radial-gradient(circle at top, #ffdf8a, #b32020 55%, #380808);
+      color: white;
+      padding: 20px;
+    }
+
+    .card {
+      width: min(430px, 100%);
+      background: rgba(0,0,0,0.45);
+      border: 3px solid #ffd166;
+      border-radius: 24px;
+      padding: 28px 22px;
+      text-align: center;
+      box-shadow: 0 18px 45px rgba(0,0,0,0.45);
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 2rem;
+    }
+
+    .option {
+      margin: 10px 0;
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.1);
+      font-size: 1.1rem;
+    }
+
+    #result {
+      margin: 20px 0;
+      padding: 20px;
+      min-height: 80px;
+      border-radius: 18px;
+      background: rgba(255,209,102,0.15);
+      border: 2px dashed rgba(255,209,102,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+
+    button {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 16px;
+      background: #ffd166;
+      color: #3a0808;
+      font-size: 1.2rem;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 6px 0 #a96d00;
+    }
+
+    button:active {
+      transform: translateY(5px);
+      box-shadow: 0 1px 0 #a96d00;
+    }
+  </style>
 </head>
+
 <body>
 
-<div id="game-wrapper">
-  <canvas id="game"></canvas>
-</div>
+  <div class="card">
+    <h1>🥡 Dinner Picker</h1>
 
-<div id="controls">
-  <div id="joystick-zone">
-    <div id="joystick-base">
-      <div id="joystick-knob"></div>
-      <div class="joystick-label">Move</div>
-    </div>
-  </div>
-  <div id="jump-zone">
-    <canvas id="charge-canvas" width="104" height="104"></canvas>
-    <div id="jump-btn">
-      <span class="btn-icon">↑</span>
-      <span class="btn-label">Jump</span>
-    </div>
-  </div>
-</div>
+    <div class="option">🌙 Main Moon</div>
+    <div class="option">🍣 Hanami</div>
+    <div class="option">🥢 Little Hunan</div>
 
-<!--
-  Script load order matters — each file depends on the ones above it:
-  1. constants.js  — canvas, helpers, shared state, skills, scoring
-  2. levels.js     — terrain build + gen, ground checks (uses constants)
-  3. terrain.js    — world drawing: bg, stars, terrain, platforms (uses constants + levels)
-  4. enemies.js    — enemy types, spawn, update, draw (uses constants + levels)
-  5. player.js     — player state, input, character draw, fog (uses constants)
-  6. hud.js        — all screens + HUD (uses constants + skills)
-  7. game.js       — main loop, update, render, input handlers (uses everything)
--->
-<script src="constants.js"></script>
-<script src="levels.js"></script>
-<script src="terrain.js"></script>
-<script src="enemies.js"></script>
-<script src="player.js"></script>
-<script src="hud.js"></script>
-<script src="game.js"></script>
+    <div id="result">Tap the button!</div>
+
+    <button onclick="pickRestaurant()">
+      Pick Dinner
+    </button>
+  </div>
+
+  <script>
+    const restaurants = [
+      "🌙 Main Moon",
+      "🍣 Hanami",
+      "🥢 Little Hunan"
+    ];
+
+    function pickRestaurant() {
+      const random =
+        restaurants[Math.floor(Math.random() * restaurants.length)];
+
+      document.getElementById("result").textContent = random;
+    }
+  </script>
 
 </body>
 </html>
