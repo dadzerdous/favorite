@@ -1,430 +1,326 @@
-// enemies.js — enemy types, spawn, update logic, all draw functions
-// Depends on: constants.js, levels.js
+// ─── ENEMIES.JS ───────────────────────────────────────────────────────────────
+// Enemy spawning, updating, dying, enemy bullets.
 
-// ══════════════════════════════════════════════════════════════
-//  ENEMIES
-// ══════════════════════════════════════════════════════════════
-const enemies = [];
-let eSpawnTimer = 0;
-let lastSpawnX  = -9999; // world X of last spawned enemy — prevents clustering
+import { ENEMY_TYPES, RAIL_W, RAIL_GAP } from './constants.js';
+import { run, combat, board, screen } from './state.js';
+import { getPanelTop, getRailPos, calcDamage, getPlasmaAoeRadius, getPenetrationChance, getResonanceDuration, getVolatilityChance, explodeOrb } from './turrets.js';
+import { spawnParticles, spawnFloater } from './effects.js';
+import { hasTurretSkill, gainPilotXP, gainTurretXP, trackQuest, saveMeta } from './meta.js';
 
-// ── Creature roster ────────────────────────────────────────
-// label = internal dispatch key (used in draw switch + update)
-// name  = display name shown briefly on spawn
-// Chapter assignment: controlled by which ETYPES_CHx array the entry lives in.
-// To move a creature: cut its row, paste into the target array.
-// To add a creature: add row here + drawXxx() + case in drawEnemies dispatch.
-const ETYPES_CH1 = [
-  // Ch1: Pincher + Swooper (temporarily added for testing swooper mechanic).
-  // Remove Swooper from this array to restore Ch1 to Pincher-only.
-  {w:32,h:20,spd:1.6,label:'crab',    name:'Pincher',  col:'#e84c3d',acc:'#ff7c6e'},
-  {w:30,h:22,spd:1.6,label:'swooper', name:'Swooper',  col:'#1a6b8a',acc:'#4dc8f0'},
-];
-const ETYPES_CH2 = [
-  // Ch2: Pincher (faster) + Idol introduced.
-  // Idol is tall and narrow — teaches that not all threats have the same clearance height.
-  {w:32,h:20,spd:1.8,label:'crab',    name:'Pincher',  col:'#e84c3d',acc:'#ff7c6e'},
-  {w:18,h:42,spd:1.4,label:'totem',   name:'Idol',     col:'#8b6914',acc:'#c9a227'},
-];
-const ETYPES_CH3 = [
-  // Ch3: Pincher + Idol return. Shellback + Bounder introduced.
-  // Bounder's hop combined with pits/platforms makes Ch3 the first truly complex chapter.
-  {w:32,h:20,spd:2.0,label:'crab',    name:'Pincher',  col:'#e84c3d',acc:'#ff7c6e'},
-  {w:18,h:42,spd:1.6,label:'totem',   name:'Idol',     col:'#8b6914',acc:'#c9a227'},
-  {w:28,h:26,spd:1.4,label:'turtle',  name:'Shellback',col:'#2e8b57',acc:'#52c97a'},
-  {w:24,h:28,spd:1.8,label:'hopper',  name:'Bounder',  col:'#5b2d8e',acc:'#b86ee8'},
-  {w:24,h:28,spd:1.8,label:'hopper',  name:'Bounder',  col:'#5b2d8e',acc:'#b86ee8'}, // double weight
-];
-const ETYPES_CH4 = [
-  // Ch4: All prior creatures + Swooper introduced.
-  // Swooper is a flying enemy that dives down — requires slide or timing to avoid.
-  // Slide (hold-down while running) is unlocked in Ch4 as the new mechanic.
-  {w:32,h:20,spd:2.2,label:'crab',    name:'Pincher',  col:'#e84c3d',acc:'#ff7c6e'},
-  {w:18,h:42,spd:1.8,label:'totem',   name:'Idol',     col:'#8b6914',acc:'#c9a227'},
-  {w:28,h:26,spd:1.6,label:'turtle',  name:'Shellback',col:'#2e8b57',acc:'#52c97a'},
-  {w:24,h:28,spd:2.0,label:'hopper',  name:'Bounder',  col:'#5b2d8e',acc:'#b86ee8'},
-  {w:30,h:22,spd:2.0,label:'swooper', name:'Swooper',  col:'#1a6b8a',acc:'#4dc8f0'},
-];
+// ── Chain kill system ─────────────────────────────────────────────────────────
+function registerKill(meta, x, y, reward, killerType) {
+  const now          = Date.now();
+  const chainTimeout = run.chainTimeout * (hasTurretSkill(meta, 'pilot', 'pr4') ? 1.5 : 1);
 
-function getETypes() {
-  if(chapter===CHAPTER.ONE)  return ETYPES_CH1;
-  if(chapter===CHAPTER.TWO)  return ETYPES_CH2;
-  if(chapter===CHAPTER.THREE)return ETYPES_CH3;
-  return ETYPES_CH4;
-}
+  if (now - run.lastKillTime < chainTimeout) {
+    run.chainCount = Math.min(run.chainCount + 1, 8);
+  } else {
+    run.chainCount = 1;
+  }
+  run.lastKillTime = now;
 
-function spawnEnemy() {
-  const pool = getETypes();
-  const t = pool[irnd(0, pool.length-1)];
-  const spawnX = player.x + canvas.width * 0.65 + rnd(0, 200);
-  // Only spawn on ground
-  const isSwooper = t.label==='swooper';
-  // Minimum world-space gap between any two enemies.
-  // Prevents clusters that make sections impassable.
-  // Ground and air enemies share the same gap budget.
-  const MIN_ENEMY_GAP = 220;
-  if(spawnX - lastSpawnX < MIN_ENEMY_GAP) return false;
-  if (!isSwooper && !isGroundAt(spawnX)) return false;
-  // Swooper spawns at a fixed high canvas Y — independent of player position.
-  // It hovers there, then periodically dips toward the player's head level.
-  // Using a fixed canvas Y prevents jitter from player vertical movement.
-  // Swooper hovers one full swooper-height above player's head.
-  // Player head = GY() - PH. Spawns t.h above that, so it's clearly in view.
-  // Spawn two full swooper-heights above player head — clearly visible, not cramped
-  const spawnY = isSwooper ? GY() - PH - t.h*2 - rnd(10, 20) : GY() - t.h/2;
-  enemies.push({
-    x: spawnX,
-    y: spawnY,
-    w:t.w, h:t.h, spd: t.spd + score*0.003,
-    label:t.label, name:t.name, col:t.col, acc:t.acc,
-    anim: rnd(0, Math.PI*2),
-    grounded: !isSwooper,
-    vy: 0,
-    hopTimer: rnd(0, 1200),   // stagger hopper timing so they don't all bounce in sync
-    swoopTimer: rnd(1200,2500), // ms before first dip
-    swooping:   false,           // true during active dip cycle
-    swoopPhase: 'down',          // 'down' | 'hold' | 'up'
-    swoopHold:  0,               // ms spent at bottom of dip
-    baseY: spawnY,               // fixed hover altitude (canvas Y, not world Y)
-    nameTimer: 1800,
-  });
-  lastSpawnX = spawnX;
-  return true; // successfully spawned
-}
-
-function updateEnemies(dt) {
-  if (gameState !== 'playing') return;
-
-  eSpawnTimer += dt;
-  const interval = Math.max(1400, 3500 - score * 12);
-  if (eSpawnTimer >= interval) {
-    const spawned = spawnEnemy();
-    if(spawned) eSpawnTimer = 0;
-    else eSpawnTimer = interval * 0.6; // retry sooner if spawn was blocked
+  // Quest: chain x5
+  if (run.chainCount >= 5) {
+    const events = trackQuest(meta, 'kinetic', 'chain5', 1);
+    events.forEach(ev => spawnFloater(x, y - 30, 'QUEST: ' + ev.questName + '!', '#ffe600'));
   }
 
-  const gy = GY();
-  for (let i = enemies.length-1; i >= 0; i--) {
-    const e = enemies[i];
-    e.x  -= e.spd;
-    e.anim += dt * 0.004;
-    if(e.nameTimer > 0) e.nameTimer -= dt;
+  const killBonus  = hasTurretSkill(meta, 'pilot', 'pr2') ? 1 : 0;
+  const earned     = Math.floor(reward * run.chainCount) + killBonus;
+  run.credits     += earned;
 
-    // Gravity for enemies (so they fall into pits)
-    if (!e.grounded) e.vy += 0.55;
-    e.y += e.vy;
+  // Lifetime credits for pilot quest
+  meta.lifetime.credits = (meta.lifetime.credits || 0) + earned;
+  trackQuest(meta, 'pilot', 'credits', earned);
 
-    // Check ground under enemy
-    const eGround = isGroundAt(e.x);
-    if (e.y + e.h/2 >= gy) {
-      if (!eGround) {
-        enemies.splice(i, 1);
-        // No score for pit kills — stomp kills will be added later.
-        continue;
-      } else {
-        e.y = gy - e.h/2; e.vy = 0; e.grounded = true;
-      }
-    } else {
-      if (e.grounded && !isGroundAt(e.x)) e.grounded = false;
-    }
+  const xpEvents = [
+    ...gainPilotXP(meta, 1 + Math.floor(run.chainCount / 3)),
+    ...gainTurretXP(meta, killerType, 2),
+  ];
 
-    // Hopper hop logic — periodic small bounce.
-    // Design intent: hop interval ~1.5s, upward velocity is ~40% of player min jump.
-    // This makes the hopper's effective height variable and unpredictable.
-    if(e.label==='hopper' && e.grounded){
-      e.hopTimer += dt;
-      if(e.hopTimer > 1500){
-        e.vy = -5.5;  // small hop — enough to be awkward, not enough to sail over pits
-        e.grounded = false;
-        e.hopTimer = 0;
-      }
-    }
+  spawnFloater(x, y, '+$' + earned + (run.chainCount > 1 ? ' x' + run.chainCount : ''),
+    run.chainCount > 2 ? '#ffe600' : '#00ff88');
 
-    // ── Swooper flight + dive logic ──────────────────────────
-    // Swooper spawns near the top of the canvas, dives toward player HEAD level.
-    // Pull-out happens at player head height — not ground.
-    // Player counters: jump OVER the swoop path, or SLIDE under it.
-    if(e.label === 'swooper'){
-      // Swooper hovers at baseY (fixed canvas altitude set on spawn).
-      // Every swoopTimer ms it dips smoothly down to player's head level,
-      // holds there briefly, then rises back to baseY.
-      // Player reads: if swooper is descending → jump or slide NOW.
-      // baseY is fixed so hover doesn't jitter with player vertical movement.
-
-      e.swoopTimer -= dt;
-
-      if(!e.swooping && e.swoopTimer <= 0){
-        e.swooping   = true;
-        e.swoopPhase = 'down'; // 'down' → 'hold' → 'up'
-        e.swoopHold  = 0;
-      }
-
-      if(e.swooping){
-        // Target = top of Lester's head. Never goes to ground.
-        // player.y is centre; player.y - PH/2 = top of head.
-        const targetY = Math.min(player.y - PH/2, GY() - e.h - 20);
-        if(e.swoopPhase === 'down'){
-          e.y += 4.5;   // fast descent
-          if(e.y >= targetY){ e.y = targetY; e.swoopPhase = 'hold'; e.swoopHold = 0; }
-        } else if(e.swoopPhase === 'hold'){
-          e.swoopHold += dt;
-          if(e.swoopHold > 700){ e.swoopPhase = 'up'; } // hold at head level — long enough to react
-        } else {
-          e.y -= 3.0;   // rise back up
-          if(e.y <= e.baseY){ e.y = e.baseY; e.swooping = false; e.swoopTimer = rnd(1500,3000); }
-        }
-      } else {
-        // Gentle hover bob at base altitude
-        e.y = e.baseY + Math.sin(e.anim * 1.8) * 5;
-      }
-
-      e.y = Math.max(10, Math.min(GY() - e.h - 8, e.y));
-    }
-
-    // Remove if far behind or in catapult zone
-    if (e.x < player.x - canvas.width * 1.5) { enemies.splice(i, 1); continue; }
-
-    // Collision with player
-    if (gameState === 'playing') {
-      const m=6;
-      const ph = player.sliding ? PH*0.35 : (player.crouching||player.ducking) ? PH*0.6 : PH;
-      if (player.x+PW/2-m > e.x-e.w/2 && player.x-PW/2+m < e.x+e.w/2 &&
-          player.y+ph/2-m > e.y-e.h/2 && player.y-ph/2+m < e.y+e.h/2) {
-
-        // Stomp kill: player falling and their centre is above enemy centre.
-        // Requires Stomp unlock. Rewards aggressive play (Mario feel).
-        const stompUnlock = getUnlock('stomp');
-        const playerAbove   = player.y < e.y - e.h * 0.25;
-        const playerFalling = player.vy > 0;
-        if(stompUnlock && stompUnlock.owned && playerAbove && playerFalling){
-          player.vy = -10;       // bounce Lester upward
-          player.grounded = false;
-          score += 25;           // stomp bonus
-          enemies.splice(i, 1);
-          continue;
-        }
-
-        // Shield: absorb the hit, break the shield, destroy the enemy.
-        // Shield repairs after 8s (see game.js). One hit per shield charge.
-        const shieldUnlock = getUnlock('shield');
-        if(shieldUnlock && shieldUnlock.owned && !player.shieldBroken){
-          player.shieldBroken      = true;
-          player.shieldFlash       = 400; // ms red flash
-          player.shieldRepairTimer = 0;
-          enemies.splice(i, 1);
-          continue;
-        }
-
-        // No protection — game over
-        gameState='gameover'; stateTimer=0; deathCount++; homeMenuCursor=0; saveScores();
-      }
-    }
-  }
+  saveMeta(meta);
+  return { earned, chainCount: run.chainCount, xpEvents };
 }
 
-// ══════════════════════════════════════════════════════════════
-//  CATAPULT
-// ══════════════════════════════════════════════════════════════
-// Draw hopper enemy — small alien creature that bounces periodically.
-// Design intent: wide body, big eyes, stubby legs. Cute but threatening.
-// The hop squash/stretch gives visual feedback of when it's about to jump.
-function drawHopper(e) {
-  const squash = e.grounded ? 1 : 0.7; // squish when on ground, stretch mid-air
-  const stretch = e.grounded ? 1 : 1.3;
-  ctx.save();
-  ctx.scale(squash, stretch);
-  // Body — round, wide, alien purple
-  ctx.fillStyle=e.col;
-  ctx.beginPath(); ctx.ellipse(0,0,e.w/2,e.h/2*0.8,0,0,Math.PI*2); ctx.fill();
-  // Belly highlight
-  ctx.fillStyle=e.acc;
-  ctx.beginPath(); ctx.ellipse(0,3,e.w/2*0.55,e.h/2*0.4,0,0,Math.PI*2); ctx.fill();
-  // Eyes — big, expressive
-  ctx.fillStyle='#fff';
-  ctx.beginPath(); ctx.ellipse(-6,-5,5,6,0,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse( 6,-5,5,6,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#1a0030';
-  ctx.beginPath(); ctx.ellipse(-6,-5,2.5,3.5,0,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse( 6,-5,2.5,3.5,0,0,Math.PI*2); ctx.fill();
-  // Shine
-  ctx.fillStyle='rgba(255,255,255,0.7)';
-  ctx.beginPath(); ctx.ellipse(-7,-7,1.2,1.5,0,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse( 5,-7,1.2,1.5,0,0,Math.PI*2); ctx.fill();
-  // Stubby legs (visible when on ground)
-  if(e.grounded){
-    ctx.fillStyle=e.col;
-    ctx.beginPath(); ctx.ellipse(-7,e.h/2*0.6,4,3,0.3,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse( 7,e.h/2*0.6,4,3,-0.3,0,Math.PI*2); ctx.fill();
-  }
-  // Antenna
-  ctx.strokeStyle=e.acc; ctx.lineWidth=1.5; ctx.lineCap='round';
-  ctx.beginPath(); ctx.moveTo(-4,-e.h/2*0.8); ctx.lineTo(-7,-e.h/2*0.8-8); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo( 4,-e.h/2*0.8); ctx.lineTo( 7,-e.h/2*0.8-8); ctx.stroke();
-  ctx.fillStyle=e.acc;
-  ctx.beginPath(); ctx.arc(-7,-e.h/2*0.8-9,2.5,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc( 7,-e.h/2*0.8-9,2.5,0,Math.PI*2); ctx.fill();
-  ctx.restore();
-}
+// ── Spawn enemy ───────────────────────────────────────────────────────────────
+export function spawnEnemy(def, wave) {
+  const cycle       = Math.floor((wave - 1) / 5);
+  const waveInCycle = ((wave - 1) % 5) + 1;
+  const earlyBoost  = (cycle === 0 && waveInCycle <= 4) ? 1.35 : 1.0;
+  const speed       = (def.speedMult * (0.8 + wave * 0.04) * earlyBoost);
+  const hpScale     = def.hpScale || 1;
+  const baseHp      = def.hpMult * (3 + wave * 0.6) * hpScale;
 
-// drawCatapult: draws catapult at given world X.
-// Reused for both Ch1 (CATAPULT_X) and Ch2 (CATAPULT_X2).
-// Swooper — a winged creature that flies and dives.
-// Design intent: thin horizontal silhouette so slide (low profile) clearly counters it.
-// Wings animate with a flap cycle; body tilts during dive.
-function drawSwooper(e) {
-  const diving = e.swooping;
-  const tilt = diving ? 0.5 : -0.1;
-  ctx.save();
-  ctx.rotate(tilt);
+  // Spawn just above the visible zoomed area (a few frames out)
+  // getViewTransform imported from draw is circular -- use a simple offset
+  const spawnY = def.y ?? -40; // just off top
 
-  // Body — sleek, horizontal
-  ctx.fillStyle=e.col;
-  ctx.beginPath(); ctx.ellipse(0,0,e.w/2,e.h/2,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle=e.acc;
-  ctx.beginPath(); ctx.ellipse(-2,-2,e.w/3,e.h/3,-0.2,0,Math.PI*2); ctx.fill();
-
-  // Wings — animated flap
-  const flapAngle = diving ? 0.3 : Math.sin(e.anim*4)*0.5;
-  ctx.fillStyle=e.col;
-  // Left wing
-  ctx.save(); ctx.translate(-e.w/2+4, 0); ctx.rotate(-flapAngle);
-  ctx.beginPath(); ctx.ellipse(-10,0,14,5,-0.2,0,Math.PI*2); ctx.fill();
-  ctx.restore();
-  // Right wing
-  ctx.save(); ctx.translate(e.w/2-4, 0); ctx.rotate(flapAngle);
-  ctx.beginPath(); ctx.ellipse(10,0,14,5,0.2,0,Math.PI*2); ctx.fill();
-  ctx.restore();
-
-  // Eyes — beady, forward-facing
-  ctx.fillStyle='#fff';
-  ctx.beginPath(); ctx.ellipse(e.w/2-5,-3,3,3,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#0a1a2a';
-  ctx.beginPath(); ctx.ellipse(e.w/2-4,-3,1.5,1.5,0,0,Math.PI*2); ctx.fill();
-
-  // Beak
-  ctx.fillStyle=e.acc;
-  ctx.beginPath();
-  ctx.moveTo(e.w/2+2,-1); ctx.lineTo(e.w/2+8,0); ctx.lineTo(e.w/2+2,2);
-  ctx.closePath(); ctx.fill();
-
-  ctx.restore();
-}
-
-function drawCatapult(ts, worldX) {
-  const sx = wx(worldX);
-  const gy = GY();
-  if(sx < -200 || sx > canvas.width+200) return;
-
-  // Base / wheels
-  ctx.fillStyle='#6b3a1f';
-  ctx.fillRect(sx-18,gy-28,36,28);
-  ctx.fillStyle='#4a2810'; ctx.fillRect(sx-22,gy-8,44,10);
-  // Wheels
-  [sx-14, sx+14].forEach(wx2=>{
-    ctx.beginPath(); ctx.arc(wx2,gy+2,10,0,Math.PI*2);
-    ctx.fillStyle='#3a1f0a'; ctx.fill();
-    ctx.strokeStyle='#8b6020'; ctx.lineWidth=2; ctx.stroke();
-    ctx.beginPath(); ctx.arc(wx2,gy+2,4,0,Math.PI*2);
-    ctx.fillStyle='#c9a227'; ctx.fill();
-  });
-
-  // Arm (rotates based on catapult state)
-  let armAngle = -Math.PI * 0.7; // default: arm back (loaded)
-  if(catapultPhase===2||catapultPhase===3){
-    // launch: arm swings forward
-    const t = Math.min(catapultTimer/300,1);
-    armAngle = lerp(-Math.PI*0.7, Math.PI*0.25, t);
-  }
-  ctx.save();
-  ctx.translate(sx, gy-20);
-  ctx.rotate(armAngle);
-  ctx.fillStyle='#8b4a24'; ctx.fillRect(-4,-50,8,50); // arm beam
-  // Cup at tip
-  ctx.beginPath(); ctx.arc(0,-52,8,0,Math.PI*2);
-  ctx.fillStyle='#6b3a1f'; ctx.fill();
-  ctx.restore();
-  // Counterweight
-  ctx.save();
-  ctx.translate(sx,gy-20);
-  ctx.rotate(armAngle);
-  ctx.fillStyle='#333';
-  ctx.fillRect(-7,10,14,18);
-  ctx.restore();
-
-  // "LAUNCH" sign near catapult
-  if(catapultPhase===0){
-    const dist = worldX - player.x;
-    if(dist < 500 && dist > 0){
-      const alpha = Math.max(0, 1-(dist-100)/300);
-      ctx.save();
-      ctx.globalAlpha=alpha*Math.abs(Math.sin(ts*0.003));
-      ctx.fillStyle='#ffd66b'; ctx.font='bold 14px Courier New'; ctx.textAlign='center';
-      ctx.fillText('→ CATAPULT →', sx, gy-60);
-      ctx.restore();
-    }
-  }
-}
-
-// ══════════════════════════════════════════════════════════════
-//  ENEMIES DRAWING
-// ══════════════════════════════════════════════════════════════
-function drawEnemies() {
-  for(const e of enemies){
-    const sx=wx(e.x); if(sx<-100||sx>canvas.width+100) continue;
-    const bob = e.grounded ? Math.sin(e.anim)*2 : 0;
-    ctx.save(); ctx.translate(sx,e.y+bob);
-    if(e.label==='crab')          drawCrab(e);
-    else if(e.label==='totem')    drawTotem(e);
-    else if(e.label==='hopper')   drawHopper(e);
-    else if(e.label==='swooper')  drawSwooper(e);
-    else                          drawTurtle(e);
-    // Exclamation mark — always shown
-    ctx.fillStyle='rgba(255,220,100,0.85)'; ctx.font='bold 12px Courier New'; ctx.textAlign='center';
-    ctx.fillText('!',0,-e.h/2-10);
-    // Creature name fades in on spawn, then disappears
-    if(e.nameTimer > 0){
-      const na = Math.min(e.nameTimer/400, 1) * Math.min(e.nameTimer, 400)/400;
-      ctx.save(); ctx.globalAlpha=na;
-      ctx.fillStyle='#fff'; ctx.font='9px Courier New'; ctx.textAlign='center';
-      ctx.fillText(e.name, 0, -e.h/2-22);
-      ctx.restore();
-    }
-    ctx.restore();
-  }
-}
-function drawCrab(e){
-  ctx.fillStyle=e.col; ctx.beginPath(); ctx.ellipse(0,0,e.w/2,e.h/2,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle=e.acc; ctx.beginPath(); ctx.ellipse(-4,-4,e.w/4,e.h/4,-0.3,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle=e.col;
-  ctx.beginPath(); ctx.ellipse(-e.w/2-6,-2,7,5,-0.4,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(e.w/2+6,-2,7,5,0.4,0,Math.PI*2); ctx.fill();
-  ['#fff','#111'].forEach((c,ci)=>{
-    ctx.fillStyle=c;
-    const r=ci?1.5:3;
-    ctx.beginPath(); ctx.arc(-5,-e.h/2-3,r,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(5,-e.h/2-3,r,0,Math.PI*2); ctx.fill();
+  combat.enemies.push({
+    ...def,
+    x:          def.x ?? (60 + Math.random() * (screen.W - 120)),
+    y:          spawnY,
+    hp:         baseHp,
+    maxHp:      baseHp,
+    speed,
+    angle:      Math.random() * Math.PI * 2,
+    rotSpeed:   (Math.random() * 0.03 + 0.01) * (Math.random() < 0.5 ? 1 : -1),
+    burnTimer:  0, burnDmg: 0,
+    slowTimer:  0, slowAmt: 0,
+    shootTimer: Math.floor(Math.random() * 120),
+    phase:      Math.random() * Math.PI * 2,
+    driftX:     0,
   });
 }
-function drawTotem(e){
-  ctx.fillStyle=e.col; ctx.fillRect(-e.w/2,-e.h/2,e.w,e.h);
-  ctx.strokeStyle='#5a3d00'; ctx.lineWidth=1;
-  [-8,0,8].forEach(dy=>{ctx.beginPath();ctx.moveTo(-e.w/2,dy);ctx.lineTo(e.w/2,dy);ctx.stroke();});
-  ctx.fillStyle=e.acc; ctx.fillRect(-e.w/2+2,-e.h/2+2,e.w-4,18);
-  ctx.fillStyle='#3a1800'; ctx.fillRect(-6,-e.h/2+5,4,4); ctx.fillRect(2,-e.h/2+5,4,4);
-  ctx.strokeStyle='#3a1800'; ctx.beginPath(); ctx.moveTo(-5,-e.h/2+14); ctx.lineTo(5,-e.h/2+14); ctx.stroke();
-}
-function drawTurtle(e){
-  ctx.fillStyle=e.col; ctx.beginPath(); ctx.ellipse(0,-2,e.w/2,e.h/2-2,0,0,Math.PI*2); ctx.fill();
-  ctx.strokeStyle=e.acc; ctx.lineWidth=1.5;
-  ctx.beginPath(); ctx.moveTo(0,-e.h/2+2); ctx.lineTo(0,e.h/2-6); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-e.w/2+4,-4); ctx.lineTo(e.w/2-4,-4); ctx.stroke();
-  ctx.fillStyle='#3da85a'; ctx.beginPath(); ctx.ellipse(e.w/2+4,-4,7,6,0.3,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(e.w/2+7,-6,1.5,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#3da85a';
-  ctx.beginPath(); ctx.ellipse(-e.w/2+2,e.h/2-4,5,4,0,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(e.w/2-2,e.h/2-4,5,4,0,0,Math.PI*2); ctx.fill();
+
+// ── Update enemies ────────────────────────────────────────────────────────────
+export function updateEnemies(meta, onDeath, onBaseHit) {
+  const cycle = Math.floor((run.wave - 1) / 5);
+
+  for (let i = combat.enemies.length - 1; i >= 0; i--) {
+    const en = combat.enemies[i];
+
+    // Burn tick
+    if (en.burnTimer > 0) {
+      en.burnTimer--;
+      en.hp -= en.burnDmg;
+      run.runQuests.burndmg = (run.runQuests.burndmg || 0) + en.burnDmg;
+      trackQuest(meta, 'plasma', 'burndmg', en.burnDmg);
+      if (hasTurretSkill(meta, 'plasma', 'p6')) en.slowTimer = 30;
+    }
+
+    if (en.hp <= 0) { killEnemy(meta, i, onDeath); continue; }
+
+    // Movement
+    const slowMult = en.slowTimer > 0 ? (1 - (en.slowAmt || 0.2)) : 1;
+    if (en.slowTimer > 0) en.slowTimer--;
+
+    en.y += en.speed * slowMult;
+    if (en.id === 'yellow') en.driftX = Math.sin(combat.frameCount * 0.05 + en.phase) * 0.5;
+    en.x += en.driftX;
+
+    // Rotate
+    en.angle += en.rotSpeed * (en.slowTimer > 0 ? 0.4 : 1);
+
+    // Stage 2+ enemies shoot back
+    if (cycle >= 1 && en.id !== 'yellow') {
+      en.shootTimer = (en.shootTimer || 0) + 1;
+      const shootInterval = en.id === 'orange' ? 90 : en.id === 'red' ? 120 : 180;
+      if (en.shootTimer >= shootInterval) {
+        en.shootTimer = 0;
+        combat.enemyBullets.push({
+          x: en.x, y: en.y + 12,
+          vx: (Math.random() - 0.5) * 2,
+          vy: 3 + cycle * 0.5,
+          life: 150, r: 3, dmg: 5,
+          color: en.color,
+        });
+      }
+    }
+
+    // Reached turret zone or base
+    const turretLineY = getPanelTop() - RAIL_W - 14;
+    if (en.y > turretLineY) {
+      // Check proximity to each rail turret
+      let hitTurret = false;
+      const railCount = board.rails.length;
+      for (let ri = 0; ri < railCount; ri++) {
+        if (!board.rails[ri] || board.railHp[ri] === null) continue;
+        const rp = getRailPos(ri, railCount);
+        const tx = rp.x + RAIL_W / 2;
+        if (Math.abs(en.x - tx) < RAIL_W) {
+          board.railHp[ri] -= 10;
+          spawnParticles(tx, rp.y + RAIL_W/2, '#ff2244', 5, 4);
+          hitTurret = true;
+          if (board.railHp[ri] <= 0) {
+            spawnParticles(tx, rp.y + RAIL_W/2, '#ff2244', 20, 6);
+            spawnFloater(tx, rp.y, 'TURRET DESTROYED', '#ff2244');
+            board.rails[ri]  = null;
+            board.railHp[ri] = null;
+          }
+          break;
+        }
+      }
+      if (!hitTurret) {
+        spawnParticles(en.x, getPanelTop(), '#ff2244', 8, 5);
+        onBaseHit(8);
+      }
+      combat.enemies.splice(i, 1);
+    }
+  }
 }
 
-// ══════════════════════════════════════════════════════════════
-//  CHARACTER DRAWING
-// ══════════════════════════════════════════════════════════════
+// ── Kill enemy ────────────────────────────────────────────────────────────────
+export function killEnemy(meta, idx, onDeath) {
+  const en = combat.enemies[idx];
+  if (!en) return;
+
+  spawnParticles(en.x, en.y, en.color, 10, 6);
+
+  // Volatility: burning enemies explode on death
+  const vol = getVolatilityChance(meta);
+  if (en.burnTimer > 0 && vol > 0 && Math.random() < vol) {
+    const boom = getPlasmaAoeRadius(meta) + 20;
+    spawnParticles(en.x, en.y, '#ff6600', 15, 7);
+    spawnFloater(en.x, en.y - 20, 'VOLATILE!', '#ff6600');
+    for (let k = combat.enemies.length - 1; k >= 0; k--) {
+      if (k === idx) continue;
+      const splash = combat.enemies[k];
+      if (splash && Math.hypot(splash.x - en.x, splash.y - en.y) < boom) {
+        splash.lastHitType = 'plasma'; // volatility = plasma kill
+        splash.hp -= 5;
+        if (splash.hp <= 0) killEnemy(meta, k, onDeath);
+      }
+    }
+  }
+
+  const result = registerKill(meta, en.x, en.y, en.reward, en.lastHitType || 'kinetic');
+  combat.enemiesKilled++;
+  combat.enemies.splice(idx, 1);
+
+  if (onDeath) onDeath(result);
+}
+
+// ── Update player bullets ─────────────────────────────────────────────────────
+export function updateBullets(meta, onEnemyKill) {
+  const panelTop = getPanelTop();
+
+  for (let i = combat.bullets.length - 1; i >= 0; i--) {
+    const b = combat.bullets[i];
+    b.x += b.vx; b.y += b.vy; b.life--;
+
+    if (b.life <= 0 || b.x < 0 || b.x > screen.W || b.y < 0 || b.y > screen.H) {
+      // Plasma orb timeout — explode anyway
+      if (b.isOrb) {
+        spawnParticles(b.x, b.y, '#ff6600', 20, 6);
+        explodeOrb(meta, b, onEnemyKill);
+        for (let k = combat.enemies.length - 1; k >= 0; k--) {
+          if (combat.enemies[k]?._dead) { delete combat.enemies[k]._dead; killEnemy(meta, k, onEnemyKill); }
+        }
+      }
+      combat.bullets.splice(i, 1); continue;
+    }
+
+    // Plasma orb: check collision by orb radius
+    if (b.isOrb) {
+      let hit = false;
+      for (let j = combat.enemies.length - 1; j >= 0; j--) {
+        const en = combat.enemies[j];
+        if (Math.hypot(en.x - b.x, en.y - b.y) < (b.orbR + 10)) {
+          hit = true; break;
+        }
+      }
+      if (combat.boss && Math.hypot(combat.boss.x - b.x, combat.boss.y - b.y) < (b.orbR + combat.boss.size)) hit = true;
+      if (hit) {
+        spawnParticles(b.x, b.y, '#ff6600', 30, 8);
+        spawnParticles(b.x, b.y, '#ff2244', 15, 5);
+        if (b.crit) spawnFloater(b.x, b.y - 20, 'CRIT!', '#ffe600');
+        explodeOrb(meta, b, onEnemyKill);
+        for (let k = combat.enemies.length - 1; k >= 0; k--) {
+          if (combat.enemies[k]?._dead) { delete combat.enemies[k]._dead; killEnemy(meta, k, onEnemyKill); }
+        }
+        combat.bullets.splice(i, 1);
+      }
+      continue; // skip kinetic logic for orbs
+    }
+
+    let bulletDead = false;
+
+    for (let j = combat.enemies.length - 1; j >= 0; j--) {
+      const en = combat.enemies[j];
+      if (Math.hypot(en.x - b.x, en.y - b.y) >= 18) continue;
+
+      en.lastHitType = b.type;
+      const dmg = calcDamage(meta, b, en);
+      en.hp -= dmg;
+
+      // Crit visual feedback
+      if (b.crit) spawnFloater(en.x, en.y - 16, 'CRIT!', '#ffe600');
+
+      // Slow on hit (energy)
+      if (b.type === 'energy' && hasTurretSkill(meta, 'energy', 'e2')) {
+        if (!en.slowTimer) {
+          run.runQuests.slowed++;
+          trackQuest(meta, 'energy', 'slowed', 1);
+        }
+        en.slowTimer = 90 + getResonanceDuration(meta);
+        en.slowAmt   = 0.2;
+      }
+
+      // Burn on hit (plasma)
+      if (b.type === 'plasma' && hasTurretSkill(meta, 'plasma', 'p4')) {
+        en.burnTimer = 120;
+        en.burnDmg   = 0.3 * (1 + (hasTurretSkill(meta, 'plasma', 'p5') ? 0.5 : 0));
+      }
+
+      // Instakill
+      if (b.type === 'plasma' && hasTurretSkill(meta, 'plasma', 'p9') && Math.random() < 0.05) {
+        en.hp = -9999;
+      }
+
+      // Plasma AOE splash
+      if (b.type === 'plasma') {
+        const aoeR = getPlasmaAoeRadius(meta);
+        if (aoeR > 0) {
+          let splashCount = 0;
+          spawnParticles(b.x, b.y, '#ff6600', 8, 5);
+          for (let k = combat.enemies.length - 1; k >= 0; k--) {
+            if (k === j) continue;
+            const splash = combat.enemies[k];
+            if (!splash) continue;
+            if (Math.hypot(splash.x - b.x, splash.y - b.y) < aoeR) {
+              splash.lastHitType = 'plasma';
+              splash.hp -= calcDamage(meta, b, splash) * 0.6;
+              spawnParticles(splash.x, splash.y, '#ff6600', 3, 3);
+              splashCount++;
+              if (splash.hp <= 0) killEnemy(meta, k, onEnemyKill);
+            }
+          }
+          if (splashCount >= 2) {
+            run.runQuests.splashkills++;
+            trackQuest(meta, 'plasma', 'splashkills', 1);
+          }
+        }
+      }
+
+      spawnParticles(en.x, en.y, b.type === 'kinetic' ? '#00f5ff' : b.type === 'energy' ? '#cc00ff' : '#ff6600', 2, 4);
+
+      if (en.hp <= 0) killEnemy(meta, j, onEnemyKill);
+
+      // Penetration stat
+      const pen = getPenetrationChance(meta);
+      if (b.pierce > 0) { b.pierce--; }
+      else if (b.type === 'kinetic' && Math.random() < pen) { /* bullet continues */ }
+      else { combat.bullets.splice(i, 1); bulletDead = true; }
+      break;
+    }
+
+    // Boss hit
+    if (!bulletDead && combat.boss) {
+      const bos = combat.boss;
+      if (Math.hypot(bos.x - b.x, bos.y - b.y) < bos.size) {
+        const dmg = calcDamage(meta, b, bos);
+        bos.hp -= dmg;
+        spawnParticles(bos.x, bos.y, b.type === 'kinetic' ? '#00f5ff' : b.type === 'energy' ? '#cc00ff' : '#ff6600', 3, 5);
+        combat.bullets.splice(i, 1);
+      }
+    }
+  }
+}
+
+// ── Enemy bullets ─────────────────────────────────────────────────────────────
+export function updateEnemyBullets(onBaseHit) {
+  const panelTop = getPanelTop();
+  for (let i = combat.enemyBullets.length - 1; i >= 0; i--) {
+    const b = combat.enemyBullets[i];
+    b.x += b.vx; b.y += b.vy; b.life--;
+    if (b.life <= 0 || b.y > screen.H) { combat.enemyBullets.splice(i, 1); continue; }
+    if (b.y > panelTop) {
+      combat.enemyBullets.splice(i, 1);
+      spawnParticles(b.x, panelTop, '#ff2244', 4, 3);
+      onBaseHit(b.dmg);
+    }
+  }
+}

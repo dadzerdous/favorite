@@ -1,114 +1,909 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Chinese Restaurant Picker</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>1NEON STRIKE: MERGE</title>
+<style>
 
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: Arial, sans-serif;
-      background: radial-gradient(circle at top, #ffdf8a, #b32020 55%, #380808);
-      color: white;
-      padding: 20px;
-    }
+  :root {
+    --cyan: #00f5ff;
+    --magenta: #ff00cc;
+    --green: #00ff88;
+    --yellow: #ffe600;
+    --red: #ff2244;
+    --orange: #ff6600;
+    --bg: #030610;
+    --panel: rgba(0,20,40,0.85);
+    --kinetic: #00f5ff;
+    --energy: #cc00ff;
+    --plasma: #ff6600;
+  }
 
-    .card {
-      width: min(430px, 100%);
-      background: rgba(0,0,0,0.45);
-      border: 3px solid #ffd166;
-      border-radius: 24px;
-      padding: 28px 22px;
-      text-align: center;
-      box-shadow: 0 18px 45px rgba(0,0,0,0.45);
-    }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    h1 {
-      margin-top: 0;
-      font-size: 2rem;
-    }
+  body {
+    background: var(--bg);
+    color: var(--cyan);
+    font-family: 'Share Tech Mono', monospace;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    width: 100vw;
+    height: 100vh;
+  }
 
-    .option {
-      margin: 10px 0;
-      padding: 12px;
-      border-radius: 14px;
-      background: rgba(255,255,255,0.1);
-      font-size: 1.1rem;
-    }
+  canvas { display: block; position: absolute; top: 0; left: 0; }
 
-    #result {
-      margin: 20px 0;
-      padding: 20px;
-      min-height: 80px;
-      border-radius: 18px;
-      background: rgba(255,209,102,0.15);
-      border: 2px dashed rgba(255,209,102,0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.5rem;
-      font-weight: bold;
-    }
+  /* HUD */
+  #hud {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 10;
+  }
 
-    button {
-      width: 100%;
-      padding: 16px;
-      border: none;
-      border-radius: 16px;
-      background: #ffd166;
-      color: #3a0808;
-      font-size: 1.2rem;
-      font-weight: bold;
-      cursor: pointer;
-      box-shadow: 0 6px 0 #a96d00;
-    }
+  .hud-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
 
-    button:active {
-      transform: translateY(5px);
-      box-shadow: 0 1px 0 #a96d00;
-    }
-  </style>
+  .hud-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    opacity: 0.5;
+    text-transform: uppercase;
+  }
+
+  .hud-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    text-shadow: 0 0 10px currentColor;
+  }
+
+  #waveVal { color: var(--cyan); }
+  #creditsVal { color: var(--yellow); }
+  #shieldsVal { color: var(--green); }
+  #chainVal { color: var(--magenta); }
+  #rankVal { color: var(--cyan); }
+
+  /* Shield bar */
+  #shieldBar {
+    position: absolute;
+    top: 60px;
+    left: 0; right: 0;
+    height: 3px;
+    background: rgba(0,255,136,0.15);
+    z-index: 10;
+    pointer-events: none;
+  }
+  #shieldFill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), #00ffcc);
+    box-shadow: 0 0 8px var(--green);
+    transition: width 0.3s;
+  }
+
+  /* Heat bar */
+  #heatBar {
+    position: absolute;
+    bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 160px;
+    z-index: 21;
+    pointer-events: none;
+    text-align: center;
+  }
+  #heatLabel {
+    font-size: 8px;
+    letter-spacing: 2px;
+    opacity: 0.5;
+    margin-bottom: 2px;
+    color: var(--magenta);
+  }
+  #heatTrack {
+    height: 3px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #heatFill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan), var(--magenta));
+    box-shadow: 0 0 6px var(--magenta);
+    border-radius: 2px;
+  }
+
+  /* Bottom panel */
+  /* bottom area styled via canvas, no HTML panel needed */
+
+  #railsLabel {
+    position: absolute;
+    bottom: 198px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    letter-spacing: 4px;
+    opacity: 0.4;
+    pointer-events: none;
+    z-index: 11;
+  }
+
+  #hangarLabel {
+    position: absolute;
+    bottom: 118px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    letter-spacing: 4px;
+    opacity: 0.4;
+    pointer-events: none;
+    z-index: 11;
+  }
+
+  /* Buttons */
+  #controls {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    z-index: 20;
+    background: rgba(0,2,8,0.95);
+    border-top: 1px solid rgba(0,245,255,0.1);
+    padding: 0 8px;
+  }
+
+  .btn {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 10px 16px;
+    border: 1px solid currentColor;
+    background: rgba(0,0,0,0.6);
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .btn:active::before { opacity: 0.15; }
+
+  .btn-kinetic { color: var(--kinetic); box-shadow: 0 0 8px rgba(0,245,255,0.3); }
+  .btn-energy  { color: var(--energy);  box-shadow: 0 0 8px rgba(204,0,255,0.3); }
+  .btn-plasma  { color: var(--plasma);  box-shadow: 0 0 8px rgba(255,102,0,0.3); }
+  .btn-sell    { color: var(--red);     box-shadow: 0 0 8px rgba(255,34,68,0.2); }
+
+  /* Wave announcement */
+  #waveAnnounce {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Orbitron', monospace;
+    font-size: 48px;
+    font-weight: 900;
+    color: var(--cyan);
+    text-shadow: 0 0 30px var(--cyan), 0 0 60px var(--cyan);
+    letter-spacing: 6px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 50;
+    transition: opacity 0.4s;
+    white-space: nowrap;
+  }
+
+  /* Chain popup */
+  #chainPopup {
+    position: absolute;
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--magenta);
+    text-shadow: 0 0 20px var(--magenta);
+    pointer-events: none;
+    z-index: 40;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  /* ---- SKILL DRAWER (mobile-friendly bottom sheet) ---- */
+  /* ── Command Center Overlay ───────────────────────────────────────────────── */
+  #skillOverlay {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 88vh;
+    background: rgba(2,6,16,0.98);
+    border-top: 1px solid rgba(0,245,255,0.3);
+    box-shadow: 0 -8px 32px rgba(0,245,255,0.12);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.32s cubic-bezier(0.4,0,0.2,1);
+    touch-action: pan-y;
+  }
+  #skillOverlay.active { transform: translateY(0); }
+
+  /* Drag handle */
+  #skillDragHandle {
+    width: 36px; height: 4px;
+    background: rgba(255,255,255,0.18);
+    border-radius: 2px;
+    margin: 10px auto 6px;
+    cursor: grab;
+    flex-shrink: 0;
+  }
+
+  /* Title */
+  #ccTitle {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 5px;
+    color: rgba(0,245,255,0.5);
+    text-align: center;
+    padding-bottom: 8px;
+    flex-shrink: 0;
+  }
+
+  /* Type tabs -- row 1 */
+  #ccTypeTabs {
+    display: flex;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    flex-shrink: 0;
+  }
+  .cc-type-tab {
+    flex: 1;
+    padding: 11px 0;
+    border: none;
+    background: transparent;
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .cc-type-tab[data-type="kinetic"] { color: var(--kinetic); }
+  .cc-type-tab[data-type="energy"]  { color: var(--energy);  }
+  .cc-type-tab[data-type="plasma"]  { color: var(--plasma);  }
+  .cc-type-tab[data-type="pilot"]   { color: var(--yellow);  }
+  .cc-type-tab.active { border-bottom-color: currentColor; background: rgba(255,255,255,0.04); }
+
+  /* Type header -- rank + points */
+  #ccTypeHeader {
+    padding: 10px 16px 0;
+    flex-shrink: 0;
+  }
+  #ccTypeLabel {
+    font-family: 'Orbitron', monospace;
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 2px;
+  }
+  #ccTypeMeta {
+    font-size: 9px;
+    color: rgba(255,255,255,0.3);
+    margin-top: 2px;
+    letter-spacing: 1px;
+  }
+
+  /* XP bar -- row 2 */
+  #ccXpRow {
+    padding: 8px 16px 6px;
+    flex-shrink: 0;
+  }
+  #ccXpMeta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 8px;
+    color: rgba(255,255,255,0.3);
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+  }
+  #ccXpTrack {
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #ccXpFill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s;
+  }
+
+  /* Sub-tabs -- row 3 */
+  #ccSubTabs {
+    display: flex;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    flex-shrink: 0;
+  }
+  .cc-sub-tab {
+    flex: 1;
+    padding: 9px 0;
+    border: none;
+    background: transparent;
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .cc-sub-tab.active {
+    color: white;
+    border-bottom-color: white;
+    background: rgba(255,255,255,0.03);
+  }
+
+  /* Content area */
+  #ccContent {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 14px 16px;
+  }
+
+  /* Stat rows */
+  .stat-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .stat-info { flex: 1; min-width: 0; }
+  .stat-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    margin-bottom: 3px;
+  }
+  .stat-desc { font-size: 9px; color: rgba(255,255,255,0.3); margin-bottom: 6px; }
+  .stat-pips { display: flex; gap: 4px; }
+  .stat-pip {
+    width: 13px; height: 13px; border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    transition: background 0.2s;
+  }
+  .stat-pip.filled { }
+  .stat-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .stat-btn {
+    width: 32px; height: 32px; border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.03);
+    color: rgba(255,255,255,0.4);
+    font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    font-family: 'Share Tech Mono', monospace;
+    line-height: 1;
+  }
+  .stat-btn.enabled { border-color: currentColor; color: inherit; background: rgba(255,255,255,0.05); }
+  .stat-btn.enabled:active { background: rgba(255,255,255,0.15); }
+  .stat-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    min-width: 20px;
+    text-align: center;
+  }
+
+  /* Skill tree SVG */
+  #ccSkillSvg {
+    width: 100%;
+    touch-action: pan-y;
+  }
+
+  /* Quest card */
+  .quest-card {
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 14px;
+    margin-bottom: 12px;
+    background: rgba(255,255,255,0.02);
+  }
+  .quest-tier-badge {
+    font-size: 8px;
+    letter-spacing: 2px;
+    opacity: 0.4;
+    margin-bottom: 4px;
+  }
+  .quest-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  .quest-desc { font-size: 10px; color: rgba(255,255,255,0.4); margin-bottom: 10px; line-height: 1.5; }
+  .quest-reward {
+    font-size: 9px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 10px;
+    background: rgba(255,255,255,0.06);
+  }
+  .quest-prog-row { display: flex; align-items: center; gap: 8px; }
+  .quest-prog-track {
+    flex: 1; height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px; overflow: hidden;
+  }
+  .quest-prog-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+  .quest-prog-label { font-size: 9px; color: rgba(255,255,255,0.3); white-space: nowrap; }
+
+  #closeSkill {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    color: var(--cyan);
+    border: none;
+    border-top: 2px solid rgba(0,245,255,0.2);
+    background: rgba(0,245,255,0.05);
+    padding: 16px;
+    cursor: pointer;
+    letter-spacing: 4px;
+    width: 100%;
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+
+  /* Game Over / Boss screens */
+  #overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 200;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+  #overlay.active { display: flex; }
+
+  .overlay-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 52px;
+    font-weight: 900;
+    letter-spacing: 6px;
+    text-shadow: 0 0 40px currentColor;
+  }
+
+  .overlay-sub {
+    font-size: 13px;
+    letter-spacing: 3px;
+    opacity: 0.6;
+  }
+
+  .overlay-stat {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    color: var(--yellow);
+  }
+
+  .overlay-btn {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 14px 40px;
+    border: 2px solid var(--cyan);
+    background: transparent;
+    color: var(--cyan);
+    cursor: pointer;
+    letter-spacing: 3px;
+    margin-top: 10px;
+    transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(0,245,255,0.3);
+  }
+  .overlay-btn:hover { background: var(--cyan); color: #000; }
+
+  /* Prep phase timer */
+  #prepTimer {
+    position: absolute;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    color: var(--yellow);
+    letter-spacing: 3px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 15;
+    text-align: center;
+  }
+
+  /* Beam mode indicator */
+  #beamMode {
+    position: absolute;
+    bottom: 285px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    letter-spacing: 3px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 15;
+    transition: opacity 0.3s;
+    text-align: center;
+  }
+
+  /* Boss health */
+  #bossHpBar {
+    position: absolute;
+    top: 68px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(340px, 88%);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    z-index: 25;
+    pointer-events: none;
+  }
+  #bossHpLabel {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    color: var(--red);
+    letter-spacing: 3px;
+  }
+  #bossHpTrack {
+    width: 100%;
+    height: 6px;
+    background: rgba(255,0,0,0.15);
+    border-radius: 3px;
+  }
+  #bossHpFill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--red), var(--orange));
+    box-shadow: 0 0 8px var(--red);
+    border-radius: 3px;
+    transition: width 0.2s;
+  }
+
+</style>
 </head>
-
 <body>
 
-  <div class="card">
-    <h1>🥡 Dinner Picker</h1>
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-block">
+    <div class="hud-label">Wave</div>
+    <div class="hud-value" id="waveVal">1</div>
+  </div>
+  <div class="hud-block">
+    <div class="hud-label">Credits</div>
+    <div class="hud-value" id="creditsVal" style="color:var(--yellow)">$50</div>
+  </div>
+  <div class="hud-block">
+    <div class="hud-label">Shields</div>
+    <div class="hud-value" id="shieldsVal" style="color:var(--green)">100%</div>
+  </div>
+  <div class="hud-block">
+    <div class="hud-label">Chain</div>
+    <div class="hud-value" id="chainVal" style="color:var(--magenta)">x1</div>
+  </div>
+  <div class="hud-block" style="cursor:pointer" onclick="openSkills()">
+    <div class="hud-label">PILOT RANK</div>
+    <div class="hud-value" id="rankVal">1</div>
+    <div id="skillPtBadge" style="font-size:8px;color:var(--yellow);letter-spacing:1px;display:none;">0 PTS</div>
+  </div>
+</div>
 
-    <div class="option">🌙 Main Moon</div>
-    <div class="option">🍣 Hanami</div>
-    <div class="option">🥢 Little Hunan</div>
+<div id="shieldBar"><div id="shieldFill" style="width:100%"></div></div>
 
-    <div id="result">Tap the button!</div>
+<!-- Boss HP -->
+<div id="bossHpBar">
+  <div id="bossHpLabel">⚠ BOSS</div>
+  <div id="bossHpTrack"><div id="bossHpFill" style="width:100%"></div></div>
+</div>
 
-    <button onclick="pickRestaurant()">
-      Pick Dinner
-    </button>
+<!-- Prep timer -->
+<div id="prepTimer"></div>
+
+<!-- Wave announce -->
+<div id="waveAnnounce"></div>
+
+<!-- Chain popup -->
+<div id="chainPopup"></div>
+
+<!-- Heat bar -->
+<div id="heatBar" style="display:none">
+  <div id="heatLabel">BEAM HEAT</div>
+  <div id="heatTrack"><div id="heatFill" style="width:0%"></div></div>
+</div>
+
+<!-- Beam mode hint -->
+<div id="beamMode" style="display:none">HOLD TO FIRE BEAM</div>
+
+<div id="railsLabel" style="display:none">◈ ACTIVE RAILS ◈</div>
+<div id="hangarLabel" style="display:none">◈ HANGAR ◈</div>
+
+
+
+<!-- Controls -->
+<div id="controls">
+  <button id="buyBtn" class="btn btn-kinetic" onclick="buyTurret()">BUY $15</button>
+  <button class="btn btn-sell"    onclick="toggleSellMode()">SELL</button>
+  <button class="btn" style="color:#000;background:var(--cyan);border-color:var(--cyan);box-shadow:0 0 14px rgba(0,245,255,0.5);font-weight:900;" onclick="openSkills()">SKILLS</button>
+  <button class="btn" style="color:rgba(255,255,255,0.35);border-color:rgba(255,255,255,0.12);font-size:9px;" onclick="quitToMenu()">MENU</button>
+</div>
+
+<!-- Command Center (bottom sheet) -->
+<div id="skillOverlay">
+  <div id="skillDragHandle"></div>
+  <div id="ccTitle">COMMAND CENTER</div>
+
+  <!-- Row 1: Type tabs -->
+  <div id="ccTypeTabs">
+    <button class="cc-type-tab active" data-type="kinetic" onclick="window.ccSelectType('kinetic')">KINETIC</button>
+    <button class="cc-type-tab"        data-type="energy"  onclick="window.ccSelectType('energy')">ENERGY</button>
+    <button class="cc-type-tab"        data-type="plasma"  onclick="window.ccSelectType('plasma')">PLASMA</button>
+    <button class="cc-type-tab"        data-type="pilot"   onclick="window.ccSelectType('pilot')">PILOT</button>
   </div>
 
-  <script>
-    const restaurants = [
-      "🌙 Main Moon",
-      "🍣 Hanami",
-      "🥢 Little Hunan"
-    ];
+  <!-- Row 2: Type name + rank + points -->
+  <div id="ccTypeHeader">
+    <div id="ccTypeLabel" style="color:var(--cyan)">KINETIC</div>
+    <div id="ccTypeMeta">RANK 1 &nbsp;&bull;&nbsp; 0 SKILL PTS &nbsp;&bull;&nbsp; 0 STAT PTS</div>
+  </div>
 
-    function pickRestaurant() {
-      const random =
-        restaurants[Math.floor(Math.random() * restaurants.length)];
+  <!-- Row 3: XP bar -->
+  <div id="ccXpRow">
+    <div id="ccXpMeta"><span>XP</span><span id="ccXpNums">0 / 250</span></div>
+    <div id="ccXpTrack"><div id="ccXpFill" style="width:0%"></div></div>
+  </div>
 
-      document.getElementById("result").textContent = random;
-    }
-  </script>
+  <!-- Row 4: Sub-tabs -->
+  <div id="ccSubTabs">
+    <button class="cc-sub-tab active" onclick="window.ccSelectSub('stats')">STATS</button>
+    <button class="cc-sub-tab"        onclick="window.ccSelectSub('skills')">SKILLS</button>
+    <button class="cc-sub-tab"        onclick="window.ccSelectSub('quests')">QUESTS</button>
+  </div>
 
+  <!-- Content -->
+  <div id="ccContent"></div>
+
+  <button id="closeSkill" onclick="closeSkills()">CLOSE</button>
+</div>
+
+<!-- Game Over / Boss Overlay -->
+<div id="overlay">
+  <div class="overlay-title" id="overlayTitle" style="color:var(--red)">DESTROYED</div>
+  <div class="overlay-sub" id="overlaySub">YOUR BASE HAS FALLEN</div>
+  <div class="overlay-stat" id="overlayStat"></div>
+  <button class="overlay-btn" id="overlayBtn" onclick="restartGame()">DEPLOY AGAIN</button>
+  <button class="overlay-btn" onclick="quitToMenu()" style="border-color:rgba(255,255,255,0.25);color:rgba(255,255,255,0.4);box-shadow:none;font-size:11px;padding:10px 30px;">MAIN MENU</button>
+</div>
+
+<!-- Main Menu -->
+<div id="splash" style="position:absolute;inset:0;background:#030610;z-index:300;display:flex;flex-direction:column;align-items:center;overflow:hidden;">
+
+  <!-- Logo -->
+  <div style="padding-top:clamp(20px,5vh,50px);text-align:center;flex-shrink:0;">
+    <div style="font-family:'Orbitron',monospace;font-size:11px;letter-spacing:6px;color:var(--cyan);opacity:0.4;margin-bottom:10px;">DEFENSE SYSTEMS v1.0</div>
+    <div style="font-family:'Orbitron',monospace;font-size:clamp(36px,8vw,64px);font-weight:900;color:var(--cyan);text-shadow:0 0 40px var(--cyan),0 0 80px rgba(0,245,255,0.3);letter-spacing:4px;line-height:1">NEON<br>STRIKE</div>
+    <div style="font-family:'Orbitron',monospace;font-size:14px;letter-spacing:10px;color:var(--magenta);text-shadow:0 0 15px var(--magenta);margin-top:6px;">MERGE</div>
+  </div>
+
+  <!-- Divider -->
+  <div style="width:min(280px,80%);height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);margin:16px 0;flex-shrink:0;"></div>
+
+  <!-- Stats grid -->
+  <div style="width:min(340px,90%);flex-shrink:0;margin-bottom:14px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px;">
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:8px;text-align:center;">
+        <div style="font-size:8px;letter-spacing:2px;color:rgba(255,255,255,0.3);margin-bottom:4px;">BEST WAVE</div>
+        <div style="font-family:'Orbitron',monospace;font-size:18px;color:var(--yellow)" id="splashHigh">--</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:8px;text-align:center;">
+        <div style="font-size:8px;letter-spacing:2px;color:rgba(255,255,255,0.3);margin-bottom:4px;">PILOT RANK</div>
+        <div style="font-family:'Orbitron',monospace;font-size:18px;color:var(--yellow)" id="splashRank">1</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:8px;text-align:center;">
+        <div style="font-size:8px;letter-spacing:2px;color:rgba(255,255,255,0.3);margin-bottom:4px;">TOTAL RUNS</div>
+        <div style="font-family:'Orbitron',monospace;font-size:18px;color:var(--yellow)" id="splashRuns">0</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+      <div style="background:rgba(0,245,255,0.04);border:1px solid rgba(0,245,255,0.12);border-radius:6px;padding:6px;text-align:center;">
+        <div style="font-size:7px;letter-spacing:1px;color:var(--cyan);margin-bottom:3px;">KINETIC</div>
+        <div style="font-family:'Orbitron',monospace;font-size:13px;color:var(--cyan)" id="splashKRank">R1</div>
+      </div>
+      <div style="background:rgba(204,0,255,0.04);border:1px solid rgba(204,0,255,0.12);border-radius:6px;padding:6px;text-align:center;">
+        <div style="font-size:7px;letter-spacing:1px;color:var(--energy);margin-bottom:3px;">ENERGY</div>
+        <div style="font-family:'Orbitron',monospace;font-size:13px;color:var(--energy)" id="splashERank">R1</div>
+      </div>
+      <div style="background:rgba(255,102,0,0.04);border:1px solid rgba(255,102,0,0.12);border-radius:6px;padding:6px;text-align:center;">
+        <div style="font-size:7px;letter-spacing:1px;color:var(--plasma);margin-bottom:3px;">PLASMA</div>
+        <div style="font-family:'Orbitron',monospace;font-size:13px;color:var(--plasma)" id="splashPRank">R1</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab buttons -->
+  <div style="display:flex;gap:0;border:1px solid rgba(0,245,255,0.25);flex-shrink:0;margin-bottom:16px;">
+    <button id="tabPlay"   onclick="splashTab('play')"   style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;padding:10px 20px;border:none;background:var(--cyan);color:#000;cursor:pointer;font-weight:700;">PLAY</button>
+    
+    <button id="tabHow"    onclick="splashTab('how')"    style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;padding:10px 20px;border:none;background:transparent;color:var(--cyan);cursor:pointer;font-weight:700;">HOW TO PLAY</button>
+  </div>
+
+  <!-- PLAY panel -->
+  <div id="panelPlay" style="display:flex;flex-direction:column;align-items:center;gap:12px;flex-shrink:0;">
+    <button onclick="startGame()" style="font-family:'Orbitron',monospace;font-size:15px;font-weight:900;padding:16px 60px;border:2px solid var(--cyan);background:transparent;color:var(--cyan);cursor:pointer;letter-spacing:4px;box-shadow:0 0 24px rgba(0,245,255,0.35);transition:all 0.2s;"
+      onmouseover="this.style.background='var(--cyan)';this.style.color='#000'"
+      onmouseout="this.style.background='transparent';this.style.color='var(--cyan)'">
+      DEPLOY
+    </button>
+    <button onclick="resetMeta()" style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;padding:7px 20px;border:1px solid rgba(255,34,68,0.3);background:transparent;color:rgba(255,34,68,0.4);cursor:pointer;transition:all 0.2s;"
+      onmouseover="this.style.color='#ff2244';this.style.borderColor='#ff2244'"
+      onmouseout="this.style.color='rgba(255,34,68,0.4)';this.style.borderColor='rgba(255,34,68,0.3)'">
+      RESET PROGRESS
+    </button>
+    <a href="https://singleframegames.com" target="_blank" style="font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(255,255,255,0.18);letter-spacing:2px;text-decoration:none;margin-top:4px;transition:color 0.2s;"
+      onmouseover="this.style.color='rgba(255,255,255,0.5)'"
+      onmouseout="this.style.color='rgba(255,255,255,0.18)'">
+      SINGLEFRAMEGAMES.COM
+    </a>
+  </div>
+
+  <!-- HOW TO PLAY panel (hidden by default) -->
+  <div id="panelHow" style="display:none;width:min(480px,92%);overflow-y:auto;padding:0 4px 20px;-webkit-overflow-scrolling:touch;">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+
+      <!-- Card helper -->
+      <div style="grid-column:1/-1;background:rgba(0,245,255,0.04);border:1px solid rgba(0,245,255,0.15);border-radius:6px;padding:14px 16px;">
+        <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:3px;color:var(--cyan);margin-bottom:10px;">CORE LOOP</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(255,255,255,0.6);line-height:1.8;">
+          1. Buy a turret &mdash; get a random type<br>
+          2. Drag it into a <span style="color:var(--cyan)">RAIL</span> slot to activate<br>
+          3. Merge two of the same type &amp; level to upgrade<br>
+          4. Survive the wave, earn credits, repeat
+        </div>
+      </div>
+
+      <!-- Layout diagram -->
+      <div style="grid-column:1/-1;background:rgba(0,245,255,0.03);border:1px solid rgba(0,245,255,0.12);border-radius:6px;padding:14px 16px;">
+        <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:3px;color:var(--cyan);margin-bottom:12px;">LAYOUT</div>
+        <svg viewBox="0 0 320 130" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:320px;display:block;margin:0 auto;">
+          <!-- Enemy zone -->
+          <rect x="0" y="0" width="320" height="60" fill="rgba(255,34,68,0.06)" rx="3"/>
+          <text x="160" y="14" fill="rgba(255,34,68,0.5)" font-family="monospace" font-size="8" text-anchor="middle" letter-spacing="2">ENEMY ZONE</text>
+          <!-- enemy shapes -->
+          <rect x="30" y="22" width="14" height="14" fill="none" stroke="#00aaff" stroke-width="1.5" transform="rotate(45,37,29)"/>
+          <polygon points="80,22 90,36 70,36" fill="none" stroke="#ff2244" stroke-width="1.5"/>
+          <circle cx="130" cy="29" r="7" fill="none" stroke="#ffe600" stroke-width="1.5"/>
+          <rect x="165" y="22" width="14" height="14" fill="none" stroke="#cc00ff" stroke-width="1.5"/>
+          <polygon points="230,22 244,29 230,36 216,29" fill="none" stroke="#ff6600" stroke-width="1.5"/>
+          <!-- base line -->
+          <line x1="0" y1="62" x2="320" y2="62" stroke="rgba(0,245,255,0.3)" stroke-width="1" stroke-dasharray="5,5"/>
+          <text x="4" y="71" fill="rgba(0,245,255,0.35)" font-family="monospace" font-size="7" letter-spacing="1">BASE LINE</text>
+          <!-- Rails -->
+          <text x="160" y="80" fill="rgba(0,245,255,0.6)" font-family="monospace" font-size="7" text-anchor="middle" letter-spacing="3">RAILS (ACTIVE)</text>
+          <rect x="60" y="83" width="28" height="28" fill="rgba(0,245,255,0.08)" stroke="rgba(0,245,255,0.7)" stroke-width="1.5" rx="2"/>
+          <circle cx="74" cy="97" r="8" fill="none" stroke="#00f5ff" stroke-width="1.5"/>
+          <text x="74" y="101" fill="#00f5ff" font-family="monospace" font-size="7" text-anchor="middle">1</text>
+          <rect x="96" y="83" width="28" height="28" fill="rgba(0,245,255,0.04)" stroke="rgba(0,245,255,0.35)" stroke-width="1" stroke-dasharray="3,3" rx="2"/>
+          <rect x="132" y="83" width="28" height="28" fill="rgba(0,245,255,0.04)" stroke="rgba(0,245,255,0.35)" stroke-width="1" stroke-dasharray="3,3" rx="2"/>
+          <!-- Hangar -->
+          <text x="160" y="118" fill="rgba(0,245,255,0.4)" font-family="monospace" font-size="7" text-anchor="middle" letter-spacing="3">HANGAR (STORAGE)</text>
+          <rect x="195" y="83" width="20" height="20" fill="rgba(0,245,255,0.06)" stroke="rgba(0,245,255,0.4)" stroke-width="1" rx="2"/>
+          <polygon points="205,86 211,96 199,96" fill="none" stroke="#ff6600" stroke-width="1.2"/>
+          <text x="205" y="100" fill="#ff6600" font-family="monospace" font-size="5" text-anchor="middle">1</text>
+          <rect x="218" y="83" width="20" height="20" fill="rgba(0,245,255,0.06)" stroke="rgba(0,245,255,0.4)" stroke-width="1" rx="2"/>
+          <rect x="241" y="83" width="20" height="20" fill="rgba(0,245,255,0.04)" stroke="rgba(0,245,255,0.2)" stroke-width="1" stroke-dasharray="2,2" rx="2"/>
+          <rect x="264" y="83" width="20" height="20" fill="rgba(0,245,255,0.04)" stroke="rgba(0,245,255,0.2)" stroke-width="1" stroke-dasharray="2,2" rx="2"/>
+          <!-- drag arrow -->
+          <path d="M110 97 Q146 90 193 90" fill="none" stroke="rgba(255,255,0,0.4)" stroke-width="1" stroke-dasharray="3,2"/>
+          <polygon points="193,87 198,90 193,93" fill="rgba(255,255,0,0.5)"/>
+          <text x="146" y="86" fill="rgba(255,255,0,0.5)" font-family="monospace" font-size="6" text-anchor="middle">DRAG</text>
+        </svg>
+      </div>
+
+      <div style="background:rgba(0,245,255,0.04);border:1px solid rgba(0,245,255,0.15);border-radius:6px;padding:14px 16px;">
+        <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:3px;color:var(--cyan);margin-bottom:10px;">TURRET TYPES</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:10px;line-height:2;">
+          <span style="color:var(--kinetic)">&#9645; KINETIC</span> &mdash; fast, piercing<br>
+          <span style="color:var(--energy)">&#9672; ENERGY</span> &mdash; slows, arcs<br>
+          <span style="color:var(--plasma)">&#9650; PLASMA</span> &mdash; burn, AOE
+        </div>
+      </div>
+
+      <div style="background:rgba(204,0,255,0.04);border:1px solid rgba(204,0,255,0.15);border-radius:6px;padding:14px 16px;">
+        <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:3px;color:var(--magenta);margin-bottom:10px;">BEAM</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:rgba(255,255,255,0.6);line-height:1.8;">
+          Hold anywhere above the base line to fire a manual beam. It overheats &mdash; use it in bursts for chain kills.
+        </div>
+      </div>
+
+      <div style="background:rgba(255,230,0,0.04);border:1px solid rgba(255,230,0,0.15);border-radius:6px;padding:14px 16px;">
+        <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:3px;color:var(--yellow);margin-bottom:10px;">CHAIN KILLS</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:rgba(255,255,255,0.6);line-height:1.8;">
+          Kill enemies fast to build a chain multiplier. Higher chains = more credits per kill.
+        </div>
+      </div>
+
+      <div style="background:rgba(255,34,68,0.04);border:1px solid rgba(255,34,68,0.15);border-radius:6px;padding:14px 16px;">
+        <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:3px;color:var(--red);margin-bottom:10px;">ENEMIES</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:10px;line-height:2;color:rgba(255,255,255,0.6);">
+          <span style="color:#00aaff">BLUE</span> weak to Kinetic<br>
+          <span style="color:#cc00ff">PURPLE</span> weak to Energy<br>
+          <span style="color:#ff2244">RED</span> weak to Plasma<br>
+          <span style="color:#ffe600">YELLOW</span> fast runners<br>
+          <span style="color:#ff6600">ORANGE</span> heavy brutes
+        </div>
+      </div>
+
+      <div style="background:rgba(0,255,136,0.04);border:1px solid rgba(0,255,136,0.15);border-radius:6px;padding:14px 16px;">
+        <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:3px;color:var(--green);margin-bottom:10px;">PROGRESSION</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:rgba(255,255,255,0.6);line-height:1.8;">
+          Earn XP to rank up Pilot &amp; each turret type. Spend ranks in the <span style="color:var(--cyan)">SKILLS</span> tree. Progress carries across runs. Boss every 5 waves.
+        </div>
+      </div>
+
+    </div>
+
+    <button onclick="splashTab('play')" style="font-family:'Orbitron',monospace;font-size:11px;letter-spacing:3px;margin-top:16px;padding:12px 40px;border:1px solid var(--cyan);background:transparent;color:var(--cyan);cursor:pointer;width:100%;">BACK</button>
+
+    <div style="text-align:center;margin-top:10px;padding-bottom:8px;">
+      <a href="https://singleframegames.com" target="_blank" style="font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(255,255,255,0.2);letter-spacing:2px;text-decoration:none;">SINGLEFRAMEGAMES.COM</a>
+    </div>
+  </div>
+
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- Turret stats panel (HTML so never clipped) -->
+<div id="statsPanel" style="
+  display:none;position:absolute;left:10px;z-index:30;
+  width:168px;background:rgba(0,4,14,0.97);
+  border-radius:6px;pointer-events:none;
+  font-family:'Share Tech Mono',monospace;
+  padding:10px 12px 12px;
+"></div>
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- Turret stats panel (HTML so never clipped) -->
+<div id="statsPanel" style="
+  display:none;position:absolute;left:10px;z-index:30;
+  width:168px;background:rgba(0,4,14,0.97);
+  border-radius:6px;pointer-events:none;
+  font-family:'Share Tech Mono',monospace;
+  padding:10px 12px 12px;
+"></div>
+
+<script type="module" src="./main.js"></script>
 </body>
 </html>
