@@ -216,8 +216,8 @@ export function tickQuestSave(meta) {
     _questSaveTimer = 0; _questSaveDirty = false; saveMeta(meta);
   }
 }
- * Pass highFrequency=true for burn damage etc to use batched save.
- */
+
+// Track quest progress. Pass highFrequency=true for burn damage (batched save).
 export function trackQuest(meta, type, statKey, amount, highFrequency = false) {
   if (!meta.quests) meta.quests = {};
   const defs = QUEST_DEFS[type] || [];
