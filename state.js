@@ -7,7 +7,7 @@
   let coins = 0;
 
   let TUBE_COUNT = 1;
-  let VIAL_COUNT = 1;
+  let VIAL_COUNT = 0;
 
   // onboarding gates — teach one thing at a time before the full game opens up
   let primaryBucketSlots = 0;      // purchased extra primary buckets
@@ -23,7 +23,8 @@
   let vials = [];   // [{ color: null|string, amount: number }, ...] length VIAL_COUNT
   let bagCapacityPerTube = 4;
   let storageCapacityPerVial = 4;
-let vialSellBonusLevel = 0;
+  let vialSellBonusLevel = 0;
+  let tubeSellBonusLevel = 0;
 
   // how many "parts" one item of a mixed color takes up in a vial —
   // secondary colors (2 raw ingredients) take 2 parts; raw colors are implicitly 1.
@@ -37,6 +38,7 @@ let vialSellBonusLevel = 0;
   let dropperArmed = false;
   let dropperIngredients = []; // [{ color, source: 'field'|'tube' }, ...] up to 2
 
+  let whiteBucketPurchased = false;
   let whiteUnlocked = false;
 
   let minionCount = 0;
@@ -48,6 +50,7 @@ let vialSellBonusLevel = 0;
   let totalSold = 0;
   let totalMixed = 0;
   let totalFulfilled = 0;
+  let totalTubesSold = 0;
   let studioEarningsBonus = 0;
 
   let activeStoreTab = "store";

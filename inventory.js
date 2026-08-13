@@ -10,7 +10,11 @@
       const chip = document.createElement("div");
       if (tube.color) {
         chip.className = "stashChip" + (dropperArmed ? " pickable" : "") + (sellMode ? " sellable" : "");
-        chip.textContent = `${colorInfo[tube.color].emoji} ${tube.amount}/${bagCapacityPerTube}`;
+        const tubeFullBonus = tube.amount >= bagCapacityPerTube ? (1 + tubeSellBonusLevel) : 0;
+        const tubeValue = tube.amount + tubeFullBonus + studioEarningsBonus;
+        chip.textContent = sellMode
+          ? `${colorInfo[tube.color].emoji} ${tube.amount}/${bagCapacityPerTube} · 🪙${tubeValue}`
+          : `${colorInfo[tube.color].emoji} ${tube.amount}/${bagCapacityPerTube}`;
         chip.addEventListener("click", event => {
           if (sellMode) sellOneFromTube(index);
           else feedDropperFromTube(index, event);
@@ -32,7 +36,11 @@
         chip.className = "stashChip"
           + (sellMode ? " sellable" : "")
           + (sellMode && isFull ? " fullVial" : "");
-        chip.textContent = `${colorInfo[vial.color].emoji} ${colorInfo[vial.color].label} ${vial.amount}/${storageCapacityPerVial}`;
+        const vialFullBonus = isFull ? (1 + vialSellBonusLevel) : 0;
+        const vialValue = vial.amount + vialFullBonus + studioEarningsBonus;
+        chip.textContent = sellMode
+          ? `${colorInfo[vial.color].emoji} ${colorInfo[vial.color].label} ${vial.amount}/${storageCapacityPerVial} · 🪙${vialValue}`
+          : `${colorInfo[vial.color].emoji} ${colorInfo[vial.color].label} ${vial.amount}/${storageCapacityPerVial}`;
         if (sellMode) chip.addEventListener("click", () => sellOneFromVial(index));
       } else {
         chip.className = "stashChip empty";
@@ -84,6 +92,13 @@
     renderDropper();
     renderQuest();
     refreshPrimaryBucketVisual();
+
+    document.querySelectorAll(".source[data-color]").forEach(source => {
+      if (source.style.display === "none") return;
+      const small = source.querySelector("small");
+      if (!small) return;
+      small.textContent = sellMode ? `🪙${1 + studioEarningsBonus}` : "Tap";
+    });
 
     const mixerToolBtnEl = document.querySelector("#mixerToolBtn");
     if (mixerToolBtnEl) mixerToolBtnEl.style.display = mixerUnlocked ? "flex" : "none";

@@ -9,10 +9,10 @@
   function saveState() {
     try {
       const data = {
-        coins, tubes, vials, bagCapacityPerTube, storageCapacityPerVial, vialSellBonusLevel,
+        coins, tubes, vials, bagCapacityPerTube, storageCapacityPerVial, vialSellBonusLevel, tubeSellBonusLevel,
         primaryBucketSlots, primaryBucketColors, firstPrimaryChoice, pendingPrimaryBucketPosition, yellowUnlocked, mixerUnlocked, blueUnlocked, ordersUnlocked, rearrangeUnlocked,
-        whiteUnlocked, minionCount, minionSpeedLevel, minionCarryLevel,
-        totalGathered, totalSold, totalMixed, totalFulfilled, studioEarningsBonus,
+        whiteBucketPurchased, whiteUnlocked, minionCount, minionSpeedLevel, minionCarryLevel,
+        totalGathered, totalSold, totalMixed, totalFulfilled, totalTubesSold, studioEarningsBonus,
         currentProcessIndex, followedStepId, completedJournalSteps,
         colorGuideUnlocked, activeJournalTab, discoveredColors,
         currentOrder, sourcePositions,
@@ -43,6 +43,7 @@
       }
       storageCapacityPerVial = data.storageCapacityPerVial ?? storageCapacityPerVial;
       vialSellBonusLevel = data.vialSellBonusLevel ?? vialSellBonusLevel;
+      tubeSellBonusLevel = data.tubeSellBonusLevel ?? tubeSellBonusLevel;
       primaryBucketSlots = data.primaryBucketSlots ?? primaryBucketSlots;
       primaryBucketColors = Array.isArray(data.primaryBucketColors) ? data.primaryBucketColors : primaryBucketColors;
       firstPrimaryChoice = data.firstPrimaryChoice ?? firstPrimaryChoice;
@@ -61,6 +62,7 @@
         document.querySelector("#order").style.display = "block";
         document.querySelector("#fulfillBtn").style.display = "block";
       }
+      whiteBucketPurchased = data.whiteBucketPurchased ?? whiteBucketPurchased;
       whiteUnlocked = data.whiteUnlocked ?? whiteUnlocked;
       minionCount = data.minionCount ?? minionCount;
       minionSpeedLevel = data.minionSpeedLevel ?? minionSpeedLevel;
@@ -69,6 +71,7 @@
       totalSold = data.totalSold ?? totalSold;
       totalMixed = data.totalMixed ?? totalMixed;
       totalFulfilled = data.totalFulfilled ?? totalFulfilled;
+      totalTubesSold = data.totalTubesSold ?? totalTubesSold;
       studioEarningsBonus = data.studioEarningsBonus ?? studioEarningsBonus;
       if (typeof data.currentProcessIndex === "number") currentProcessIndex = data.currentProcessIndex;
       followedStepId = data.followedStepId ?? followedStepId;
@@ -77,7 +80,7 @@
         completedJournalSteps = data.completedJournalSteps;
       } else if (typeof data.questIndex === "number") {
         const oldOrder = [
-          "gatherRed", "sellRed", "buyYellow", "buyMixer", "firstMix",
+          "gatherRed", "sellTube", "buyYellow", "buyMixer", "firstMix",
           "buyVial2", "buyBlue", "buyOrders", "fulfill3", "collect20"
         ];
         oldOrder.slice(0, data.questIndex).forEach(id => completedJournalSteps[id] = true);

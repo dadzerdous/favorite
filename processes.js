@@ -20,7 +20,7 @@
       completionText: "Store unlocked!",
       steps: [
         { id: "gatherRed", desc: "Gather 4 Red paint", target: 4, progress: () => Math.min(totalGathered, 4) },
-        { id: "sellRed", desc: "Sell 4 paint", target: 4, progress: () => Math.min(totalSold, 4) }
+        { id: "sellTube", desc: "Sell a tube of paint", target: 1, progress: () => Math.min(totalTubesSold, 1) }
       ]
     },
     {
@@ -41,7 +41,7 @@
       completionText: "Mixing production established!",
       steps: [
         { id: "buyMixer", desc: "Buy the Mixer", target: 1, progress: () => mixerUnlocked ? 1 : 0 },
-        { id: "buyMixerVial", desc: "Buy a Mixer Vial", target: 1, progress: () => VIAL_COUNT >= 2 ? 1 : 0 },
+        { id: "buyMixerVial", desc: "Buy your first Mixer Vial", target: 1, progress: () => VIAL_COUNT >= 1 ? 1 : 0 },
         { id: "firstMix", desc: "Create your first mixed color", target: 1, progress: () => Math.min(totalMixed, 1) }
       ]
     },
@@ -443,10 +443,16 @@
     const emptyBucket = document.querySelector("#emptyPrimaryBucket");
     if (!emptyBucket) return;
 
-    const hasEmpty = emptyPrimaryBucketCount() > 0;
+    const hasPrimaryEmpty = emptyPrimaryBucketCount() > 0;
+    const hasWhiteEmpty = whiteBucketPurchased && !whiteUnlocked;
+    const hasEmpty = hasPrimaryEmpty || hasWhiteEmpty;
+
     emptyBucket.style.display = hasEmpty ? "grid" : "none";
 
     if (!hasEmpty) return;
+
+    const small = emptyBucket.querySelector("small");
+    if (small) small.textContent = hasWhiteEmpty ? "White" : "Empty";
 
     // Keep its current position once placed so it doesn't jump around on every render.
     if (emptyBucket.dataset.placed === "true") return;

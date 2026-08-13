@@ -89,11 +89,11 @@
       maxLevel: 1,
       baseCost: 12,
       growth: 1,
-      visible: () => mixerUnlocked && VIAL_COUNT < 2,
-      desc: () => "Adds a second Mixer Vial for storing mixed paint",
+      visible: () => mixerUnlocked && VIAL_COUNT < 1,
+      desc: () => "Adds your first Mixer Vial for storing mixed paint",
       cost: function () { return this.baseCost; },
       buy: function () {
-        if (VIAL_COUNT >= 2) return;
+        if (VIAL_COUNT >= 1) return;
         vials.push({ color: null, amount: 0 });
         VIAL_COUNT++;
         this.level = 1;
@@ -138,19 +138,51 @@
       }
     },
     {
+      id: "whiteBucket",
+      name: "Buy a Bucket for White",
+      level: 0,
+      maxLevel: 1,
+      baseCost: 25,
+      growth: 1,
+      visible: () => ordersUnlocked && !whiteBucketPurchased && !whiteUnlocked,
+      desc: () => "Adds an empty bucket that can be filled with White paint",
+      cost: function () { return this.baseCost; },
+      buy: function () {
+        whiteBucketPurchased = true;
+        this.level = 1;
+        const emptyBucketEl = document.querySelector("#emptyPrimaryBucket");
+        if (emptyBucketEl) emptyBucketEl.dataset.placed = "false";
+        refreshPrimaryBucketVisual();
+      }
+    },
+    {
       id: "white",
-      name: "Unlock White Source",
+      name: "Buy White Paint",
       level: 0,
       maxLevel: 1,
       baseCost: 50,
       growth: 1,
-      visible: () => ordersUnlocked,
-      desc: () => "Adds a 4th raw color + 3 new mixable colors (pink, sky blue, cream)",
+      visible: () => ordersUnlocked && whiteBucketPurchased && !whiteUnlocked,
+      desc: () => "Fill your empty bucket with White and unlock light mixes",
       cost: function () { return this.baseCost; },
       buy: function () {
         whiteUnlocked = true;
         this.level = 1;
-        document.querySelector("#white").style.display = "grid";
+
+        const whiteEl = document.querySelector("#white");
+        whiteEl.style.display = "grid";
+
+        if (pendingPrimaryBucketPosition) {
+          whiteEl.style.left = pendingPrimaryBucketPosition.left + "px";
+          whiteEl.style.top = pendingPrimaryBucketPosition.top + "px";
+          sourcePositions.white = { ...pendingPrimaryBucketPosition };
+        }
+
+        whiteBucketPurchased = true;
+        const emptyBucketEl = document.querySelector("#emptyPrimaryBucket");
+        if (emptyBucketEl) emptyBucketEl.dataset.placed = "false";
+        pendingPrimaryBucketPosition = null;
+        refreshPrimaryBucketVisual();
       }
     },
     {
@@ -177,21 +209,29 @@
       level: 0,
       baseCost: 20,
       growth: 1.6,
-      visible: () => ordersUnlocked,
-      desc: () => `Each color tube holds: ${bagCapacityPerTube} → ${bagCapacityPerTube + 4}`,
+      maxLevel: 5,
+      visible: () => TUBE_COUNT >= 2,
+      desc: () => `Tube capacity: ${bagCapacityPerTube} → ${bagCapacityPerTube + 2}`,
       cost: function () { return Math.round(this.baseCost * Math.pow(this.growth, this.level)); },
-      buy: function () { bagCapacityPerTube += 4; this.level++; }
+      buy: function () { bagCapacityPerTube += 2; this.level++; }
     },
+
     {
-      id: "storage",
-      name: "Bigger Mixer Vials",
+      id: "fullTubeValue",
+      name: "Premium Full Tubes",
       level: 0,
-      baseCost: 25,
-      growth: 1.6,
-      visible: () => ordersUnlocked,
-      desc: () => `Each mixer vial holds: ${storageCapacityPerVial} → ${storageCapacityPerVial + 4}`,
+      maxLevel: 5,
+      baseCost: 24,
+      growth: 1.75,
+      visible: () => TUBE_COUNT >= 2,
+      desc: function () {
+        return `Full Tube bonus: +${1 + tubeSellBonusLevel} → +${2 + tubeSellBonusLevel} coins`;
+      },
       cost: function () { return Math.round(this.baseCost * Math.pow(this.growth, this.level)); },
-      buy: function () { storageCapacityPerVial += 4; this.level++; }
+      buy: function () {
+        tubeSellBonusLevel++;
+        this.level++;
+      }
     },
     {
       id: "minionSpeed",
@@ -228,7 +268,7 @@
       maxLevel: 5,
       baseCost: 25,
       growth: 1.7,
-      visible: () => mixerUnlocked,
+      visible: () => mixerUnlocked && VIAL_COUNT >= 1,
       desc: function () {
         return `Mixer Vial capacity: ${storageCapacityPerVial} → ${storageCapacityPerVial + 2}`;
       },
@@ -245,7 +285,7 @@
       maxLevel: 5,
       baseCost: 30,
       growth: 1.8,
-      visible: () => mixerUnlocked,
+      visible: () => mixerUnlocked && VIAL_COUNT >= 1,
       desc: function () {
         return `Full Mixer Vial bonus: +${1 + vialSellBonusLevel} → +${2 + vialSellBonusLevel} coins`;
       },
