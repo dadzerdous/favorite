@@ -9,7 +9,7 @@
   function saveState() {
     try {
       const data = {
-        coins, tubes, vials, bagCapacityPerTube, storageCapacityPerVial,
+        coins, tubes, vials, bagCapacityPerTube, storageCapacityPerVial, vialSellBonusLevel,
         primaryBucketSlots, primaryBucketColors, firstPrimaryChoice, pendingPrimaryBucketPosition, yellowUnlocked, mixerUnlocked, blueUnlocked, ordersUnlocked, rearrangeUnlocked,
         whiteUnlocked, minionCount, minionSpeedLevel, minionCarryLevel,
         totalGathered, totalSold, totalMixed, totalFulfilled, studioEarningsBonus,
@@ -42,6 +42,7 @@
         VIAL_COUNT = vials.length;
       }
       storageCapacityPerVial = data.storageCapacityPerVial ?? storageCapacityPerVial;
+      vialSellBonusLevel = data.vialSellBonusLevel ?? vialSellBonusLevel;
       primaryBucketSlots = data.primaryBucketSlots ?? primaryBucketSlots;
       primaryBucketColors = Array.isArray(data.primaryBucketColors) ? data.primaryBucketColors : primaryBucketColors;
       firstPrimaryChoice = data.firstPrimaryChoice ?? firstPrimaryChoice;

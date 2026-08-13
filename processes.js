@@ -41,6 +41,7 @@
       completionText: "Mixing production established!",
       steps: [
         { id: "buyMixer", desc: "Buy the Mixer", target: 1, progress: () => mixerUnlocked ? 1 : 0 },
+        { id: "buyMixerVial", desc: "Buy a Mixer Vial", target: 1, progress: () => VIAL_COUNT >= 2 ? 1 : 0 },
         { id: "firstMix", desc: "Create your first mixed color", target: 1, progress: () => Math.min(totalMixed, 1) }
       ]
     },

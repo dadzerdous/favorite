@@ -147,7 +147,7 @@
 
     let fullBonus = 0;
     vials.forEach(v => {
-      if (v.color && v.amount >= storageCapacityPerVial) fullBonus += 1;
+      if (v.color && v.amount >= storageCapacityPerVial) fullBonus += (1 + vialSellBonusLevel);
     });
 
     const earned = base + fullBonus + studioEarningsBonus;
@@ -171,7 +171,7 @@
 
     let fullBonus = 0;
     vials.forEach(v => {
-      if (v.color && v.amount >= storageCapacityPerVial) fullBonus += 1;
+      if (v.color && v.amount >= storageCapacityPerVial) fullBonus += (1 + vialSellBonusLevel);
     });
 
     const earned = raw + mixed + fullBonus + studioEarningsBonus;

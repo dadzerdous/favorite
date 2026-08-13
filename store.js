@@ -83,6 +83,23 @@
       }
     },
     {
+      id: "mixerVial",
+      name: "Buy a Mixer Vial",
+      level: 0,
+      maxLevel: 1,
+      baseCost: 12,
+      growth: 1,
+      visible: () => mixerUnlocked && VIAL_COUNT < 2,
+      desc: () => "Adds a second Mixer Vial for storing mixed paint",
+      cost: function () { return this.baseCost; },
+      buy: function () {
+        if (VIAL_COUNT >= 2) return;
+        vials.push({ color: null, amount: 0 });
+        VIAL_COUNT++;
+        this.level = 1;
+      }
+    },
+    {
       id: "unlockOrders",
       name: "Unlock Orders",
       level: 0,
@@ -203,7 +220,42 @@
       desc: function () { return `Minions collect more per visit. Currently ${1 + this.level} at a time.`; },
       cost: function () { return Math.round(this.baseCost * Math.pow(this.growth, this.level)); },
       buy: function () { minionCarryLevel++; this.level++; }
-    }
+    },
+    {
+      id: "mixerVialCapacity",
+      name: "Bigger Mixer Vials",
+      level: 0,
+      maxLevel: 5,
+      baseCost: 25,
+      growth: 1.7,
+      visible: () => mixerUnlocked,
+      desc: function () {
+        return `Mixer Vial capacity: ${storageCapacityPerVial} → ${storageCapacityPerVial + 2}`;
+      },
+      cost: function () { return Math.round(this.baseCost * Math.pow(this.growth, this.level)); },
+      buy: function () {
+        storageCapacityPerVial += 2;
+        this.level++;
+      }
+    },
+    {
+      id: "fullVialValue",
+      name: "Premium Full Vials",
+      level: 0,
+      maxLevel: 5,
+      baseCost: 30,
+      growth: 1.8,
+      visible: () => mixerUnlocked,
+      desc: function () {
+        return `Full Mixer Vial bonus: +${1 + vialSellBonusLevel} → +${2 + vialSellBonusLevel} coins`;
+      },
+      cost: function () { return Math.round(this.baseCost * Math.pow(this.growth, this.level)); },
+      buy: function () {
+        vialSellBonusLevel++;
+        this.level++;
+      }
+    },
+
   ];
 
   function minionTravelMs() { return Math.max(3000, 8000 - minionSpeedLevel * 900); }

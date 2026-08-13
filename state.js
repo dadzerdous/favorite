@@ -23,6 +23,7 @@
   let vials = [];   // [{ color: null|string, amount: number }, ...] length VIAL_COUNT
   let bagCapacityPerTube = 4;
   let storageCapacityPerVial = 4;
+let vialSellBonusLevel = 0;
 
   // how many "parts" one item of a mixed color takes up in a vial —
   // secondary colors (2 raw ingredients) take 2 parts; raw colors are implicitly 1.
