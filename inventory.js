@@ -10,18 +10,16 @@
       const chip = document.createElement("div");
       if (tube.color) {
         chip.className = "stashChip" + (dropperArmed ? " pickable" : "") + (sellMode ? " sellable" : "");
-        const tubeFullBonus = tube.amount >= bagCapacityPerTube ? (1 + tubeSellBonusLevel) : 0;
-        const tubeValue = tube.amount + tubeFullBonus + studioEarningsBonus;
+        const tubeValue = tubeSellValue(tube);
         chip.textContent = sellMode
           ? `${colorInfo[tube.color].emoji} ${tube.amount}/${bagCapacityPerTube} · 🪙${tubeValue}`
           : `${colorInfo[tube.color].emoji} ${tube.amount}/${bagCapacityPerTube}`;
-        chip.addEventListener("click", event => {
+        chip.addEventListener("click", () => {
           if (sellMode) sellOneFromTube(index);
-          else feedDropperFromTube(index, event);
         });
       } else {
         chip.className = "stashChip empty";
-        chip.textContent = "🧴 Empty Tube";
+        chip.textContent = `🧴 0/${bagCapacityPerTube}`;
       }
       bagContents.appendChild(chip);
     });
@@ -52,8 +50,6 @@
   function renderDropper() {
     dropperToggle.innerHTML = dropperArmed ? "❌<span>Done</span>" : "🎨<span>Mix</span>";
     dropperToggle.classList.toggle("armed", dropperArmed);
-    dropperFloaterEl.classList.remove("visible");
-    dropperChips.innerHTML = "";
 
     document.querySelectorAll(".source[data-color]").forEach(source => {
       const active = dropperArmed && source.style.display !== "none";
@@ -61,28 +57,19 @@
     });
   }
 
-  function positionDropperFloaterAtPoint(x, y) {
-    dropperFloaterEl.style.left = x + "px";
-    dropperFloaterEl.style.top = y + "px";
-  }
-
-  function positionDropperFloaterAtElement(el) {
-    const rect = el.getBoundingClientRect();
-    positionDropperFloaterAtPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-  }
-
-  document.addEventListener("pointermove", event => {
-    // Bucket-drag mixing no longer uses the old floating dropper cursor.
-  });
-
   function renderAll() {
     bagText.textContent = `${tubes.filter(t => t.color !== null).length} / ${TUBE_COUNT}`;
     storageText.textContent = `${vialsUsedTotal()} / ${storageMaxTotal()}`;
     coinsEl.textContent = coins;
+    renderStudioXp();
 
-    const orderInfo = colorInfo[currentOrder.color];
-    orderTarget.textContent = `1 ${orderInfo.emoji} ${orderInfo.label} Mixer Vial`;
-    rewardEl.textContent = orderRewardForColor(currentOrder.color);
+    if (currentOrder && Array.isArray(currentOrder.requirements)) {
+      orderTarget.textContent = orderRequirementText(currentOrder);
+      rewardEl.textContent = orderReward(currentOrder);
+    } else {
+      orderTarget.textContent = ordersUnlocked ? "Choose an Order" : "No Orders Yet";
+      rewardEl.textContent = "—";
+    }
 
     renderBackpack();
     renderWarehouse();
@@ -94,11 +81,24 @@
       if (source.style.display === "none") return;
       const small = source.querySelector("small");
       if (!small) return;
-      small.textContent = sellMode ? `🪙${1 + studioEarningsBonus}` : "Tap";
+      small.textContent = sellMode ? `🪙${1 + studioEarningsBonus}` : (dollyMode ? "Move" : "Tap");
+      source.classList.toggle("dollyReady", dollyMode);
+      source.classList.toggle("dollyShake", dollyMode);
     });
 
-    const mixerToolBtnEl = document.querySelector("#mixerToolBtn");
+        const sellVialsChoice = document.querySelector("#sellMixedBtnRail");
+    if (sellVialsChoice) {
+      sellVialsChoice.style.display = VIAL_COUNT > 0 ? "flex" : "none";
+    }
+
+const ordersBtnEl=document.querySelector("#fulfillBtn");if(ordersBtnEl)ordersBtnEl.classList.toggle("orderReady",ordersUnlocked&&anyOrderReady());
+const mixerToolBtnEl = document.querySelector("#mixerToolBtn");
     if (mixerToolBtnEl) mixerToolBtnEl.style.display = mixerUnlocked ? "flex" : "none";
+    if (dollyToolBtn) {
+      dollyToolBtn.style.display = rearrangeUnlocked ? "flex" : "none";
+      dollyToolBtn.classList.toggle("armed", dollyMode);
+      dollyToolBtn.innerHTML = dollyMode ? "❌<span>Dolly</span>" : "🛒<span>Dolly</span>";
+    }
 
     const warehouseRowEl = document.querySelector("#warehouseRow");
     if (warehouseRowEl) warehouseRowEl.style.display = mixerUnlocked ? "block" : "none";
@@ -116,12 +116,10 @@
     if (fulfillBtnEl) fulfillBtnEl.style.display = ordersUnlocked ? "flex" : "none";
 
     const sellBtnEl = document.querySelector("#sellBtn");
-    const sellAllBtnEl = document.querySelector("#sellAllBtn");
     if (sellBtnEl) {
       sellBtnEl.innerHTML = sellMode ? "❌<span>Done</span>" : "🪙<span>Sell</span>";
       sellBtnEl.classList.toggle("armed", sellMode);
     }
-    if (sellAllBtnEl) sellAllBtnEl.style.display = sellMode ? "flex" : "none";
 
     if (document.querySelector("#storeOverlay").classList.contains("open")) {
       renderStore();
@@ -169,6 +167,7 @@
     }
 
     totalGathered++;
+    if (!fromMinion) addStudioXp(1, "gather");
 
     source.classList.remove("pop");
     void source.offsetWidth;
@@ -176,7 +175,7 @@
 
     spawnFloater(source, `+1 ${colorInfo[color].emoji}`);
     renderAll();
-    checkQuests();
+    checkJournalSteps();
 
     if (!fromMinion) {
       

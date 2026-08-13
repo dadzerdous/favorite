@@ -13,8 +13,8 @@
   const rewardEl = document.querySelector("#reward");
   const message = document.querySelector("#message");
   const dropperToggle = document.querySelector("#mixerToolBtn");
-  const dropperChips = document.querySelector("#dropperChips");
-  const dropperFloaterEl = document.querySelector("#dropperFloater");
+  const dollyToolBtn = document.querySelector("#dollyToolBtn");
+  dollyToolBtn?.addEventListener("click", toggleDollyMode);
   const journalOverlay = document.querySelector("#journalOverlay");
 
   // =========================================================
@@ -106,4 +106,3 @@
   function randomBetween(min, max) {
     return Math.random() * (max - min) + min;
   }
-

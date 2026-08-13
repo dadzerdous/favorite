@@ -18,3 +18,11 @@
   document.querySelector("#storeTabBtn").addEventListener("click", () => setStoreTab("store"));
   document.querySelector("#upgradeTabBtn").addEventListener("click", () => setStoreTab("upgrades"));
 
+
+  document.querySelectorAll(".storeSectionBtn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activeStoreSection = btn.dataset.section || "equipment";
+      renderStore();
+      saveState();
+    });
+  });

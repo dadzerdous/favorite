@@ -1,40 +1,13 @@
-// Order fulfillment behavior.
-
-  // =========================================================
-  // FULFILL
-  // =========================================================
-
-  document.querySelector("#fulfillBtn").addEventListener("click", () => {
-    const neededColor = currentOrder.color;
-    const vial = vials.find(v =>
-      v.color === neededColor &&
-      v.amount >= storageCapacityPerVial
-    );
-
-    if (!vial) {
-      say(`Need 1 full ${colorInfo[neededColor].emoji} ${colorInfo[neededColor].label} Mixer Vial`);
-      return;
-    }
-
-    vial.color = null;
-    vial.amount = 0;
-
-    const earnedReward = orderRewardForColor(neededColor) + studioEarningsBonus;
-    coins += earnedReward;
-    pulseCoins(earnedReward);
-    totalFulfilled++;
-
-    const colors = activeOrderColors();
-    let nextColor;
-    do {
-      nextColor = colors[Math.floor(Math.random() * colors.length)];
-    } while (colors.length > 1 && nextColor === currentOrder.color);
-    currentOrder = makeOrder(nextColor);
-
-    say(`✅ Order complete! +${earnedReward}`);
-    renderAll();
-    checkQuests();
-
-    if (navigator.vibrate) navigator.vibrate([25, 20, 25]);
-  });
-
+// Orders: Quick = one full tube, Standard = one full vial, Big Job = two different full vials.
+function ensureOrderChoices(force=false){if(!ordersUnlocked)return;if(force||!Array.isArray(orderChoices)||orderChoices.length!==3)orderChoices=generateOrderChoices();}
+function isTrackedOrder(order){return !!currentOrder&&JSON.stringify(currentOrder)===JSON.stringify(order);}
+function trackOrder(order){currentOrder=JSON.parse(JSON.stringify(order));orderSelectedCount++;say(`${orderTierInfo(order.tier).label} tracked`);renderAll();renderOrdersOverlay();checkJournalSteps();saveState();}
+function regenerateOrderSlot(index){const tier=orderChoices[index]?.tier,fresh=generateOrderChoices(),lookup={quick:0,standard:1,big:2};orderChoices[index]=fresh[lookup[tier]??index];}
+function consumeOrder(order){for(const req of order.requirements){if(req.kind==="tube"){const i=tubes.findIndex(t=>t.color===req.color&&t.amount>=bagCapacityPerTube);if(i>=0){tubes[i].color=null;tubes[i].amount=0;}}else{const i=vials.findIndex(v=>v.color===req.color&&v.amount>=storageCapacityPerVial);if(i>=0){vials[i].color=null;vials[i].amount=0;}}}}
+function fulfillOrderAt(index){const order=orderChoices[index];if(!order)return;if(!canFulfillOrder(order)){say("You don't have everything for that order yet");return;}consumeOrder(order);const earned=orderReward(order)+studioEarningsBonus,orderXp=order.tier==="big"?25:order.tier==="standard"?15:8;coins+=earned;totalFulfilled++;pulseCoins(earned);addStudioXp(orderXp,"order");const wasTracked=isTrackedOrder(order);say(`✅ ${orderTierInfo(order.tier).label} complete! +${earned} · +${orderXp} XP`);regenerateOrderSlot(index);if(wasTracked)currentOrder=JSON.parse(JSON.stringify(orderChoices[index]));renderAll();renderOrdersOverlay();checkJournalSteps();saveState();}
+function renderOrdersOverlay(){ensureOrderChoices();const list=document.querySelector("#ordersChoices");if(!list)return;list.innerHTML="";orderChoices.forEach((order,index)=>{const ready=canFulfillOrder(order),tracked=isTrackedOrder(order),card=document.createElement("div");card.className="orderChoiceCard";card.classList.toggle("selected",tracked);card.innerHTML=`<div class="orderChoiceTop"><span>${tracked?"📌 ":""}${orderTierInfo(order.tier).label}</span><span>🪙 ${orderReward(order)}</span></div><div class="orderChoiceNeed">${orderRequirementText(order)}</div><div class="orderChoiceReward">${ready?"✓ Ready":"Not ready"}</div><div class="orderChoiceActions"><button class="orderTrackBtn">${tracked?"📌 Tracking":"Track"}</button>${ready?'<button class="orderCardFulfillBtn">✅ Fulfill</button>':""}</div>`;card.querySelector(".orderTrackBtn")?.addEventListener("click",e=>{e.stopPropagation();trackOrder(order);});card.querySelector(".orderCardFulfillBtn")?.addEventListener("click",e=>{e.stopPropagation();fulfillOrderAt(index);});card.addEventListener("click",()=>trackOrder(order));list.appendChild(card);});}
+function anyOrderReady(){ensureOrderChoices();return orderChoices.some(canFulfillOrder);}
+function openOrders(){if(!ordersUnlocked)return;ensureOrderChoices();document.querySelector("#ordersOverlay")?.classList.add("open");renderOrdersOverlay();}
+function closeOrders(){document.querySelector("#ordersOverlay")?.classList.remove("open");}
+document.querySelector("#fulfillBtn")?.addEventListener("click",openOrders);
+document.querySelector("#ordersCloseBtn")?.addEventListener("click",closeOrders);

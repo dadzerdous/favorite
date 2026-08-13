@@ -18,6 +18,8 @@
   let mixerUnlocked = false;
   let blueUnlocked = false;
   let ordersUnlocked = false;
+  let orderChoices = [];
+  let orderSelectedCount = 0;
 
   let tubes = [];   // [{ color: null|string, amount: number }, ...] length TUBE_COUNT
   let vials = [];   // [{ color: null|string, amount: number }, ...] length VIAL_COUNT
@@ -52,10 +54,22 @@
   let totalFulfilled = 0;
   let totalTubesSold = 0;
   let studioEarningsBonus = 0;
+  let studioXp = 0;
+  let studioLevel = 1;
+  const colorXp = {};
+  const colorTimesMade = {};
+  const colorTimesCollected = {};
+  const colorTimesUsed = {};
+  const proficientColors = {};
+  const COLOR_PROFICIENCY_XP = 25;
+  let flexibleBucketCount = 0;
+  let flexibleBucketColors = [];
 
   let activeStoreTab = "store";
+  let activeStoreSection = "equipment";
   let sellMode = false;
   let rearrangeUnlocked = false;
+  let dollyMode = false;
 
   const GRID = 30;
 

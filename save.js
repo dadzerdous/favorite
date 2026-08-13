@@ -12,10 +12,12 @@
         coins, tubes, vials, bagCapacityPerTube, storageCapacityPerVial, vialSellBonusLevel, tubeSellBonusLevel,
         primaryBucketSlots, primaryBucketColors, firstPrimaryChoice, pendingPrimaryBucketPosition, yellowUnlocked, mixerUnlocked, blueUnlocked, ordersUnlocked, rearrangeUnlocked,
         whiteBucketPurchased, whiteUnlocked, minionCount, minionSpeedLevel, minionCarryLevel,
-        totalGathered, totalSold, totalMixed, totalFulfilled, totalTubesSold, studioEarningsBonus,
+        totalGathered, totalSold, totalMixed, totalFulfilled, totalTubesSold, studioEarningsBonus, studioXp, studioLevel,
         currentProcessIndex, followedStepId, completedJournalSteps,
         colorGuideUnlocked, activeJournalTab, discoveredColors,
-        currentOrder, sourcePositions,
+        activeStoreSection,
+        colorXp, colorTimesMade, colorTimesCollected, colorTimesUsed, proficientColors, flexibleBucketCount, flexibleBucketColors,
+        currentOrder, orderChoices, orderSelectedCount, sourcePositions,
         storeItemLevels: storeItems.map(i => ({ id: i.id, level: i.level })),
         toolUpgradeLevels: toolUpgrades.map(i => ({ id: i.id, level: i.level }))
       };
@@ -72,9 +74,19 @@
       totalMixed = data.totalMixed ?? totalMixed;
       totalFulfilled = data.totalFulfilled ?? totalFulfilled;
       totalTubesSold = data.totalTubesSold ?? totalTubesSold;
+      studioXp = data.studioXp ?? studioXp;
+      studioLevel = data.studioLevel ?? studioLevel;
       studioEarningsBonus = data.studioEarningsBonus ?? studioEarningsBonus;
       if (typeof data.currentProcessIndex === "number") currentProcessIndex = data.currentProcessIndex;
       followedStepId = data.followedStepId ?? followedStepId;
+
+      if (data.colorXp && typeof data.colorXp === "object") Object.assign(colorXp, data.colorXp);
+      if (data.colorTimesMade && typeof data.colorTimesMade === "object") Object.assign(colorTimesMade, data.colorTimesMade);
+      if (data.colorTimesCollected && typeof data.colorTimesCollected === "object") Object.assign(colorTimesCollected, data.colorTimesCollected);
+      if (data.colorTimesUsed && typeof data.colorTimesUsed === "object") Object.assign(colorTimesUsed, data.colorTimesUsed);
+      if (data.proficientColors && typeof data.proficientColors === "object") Object.assign(proficientColors, data.proficientColors);
+      flexibleBucketCount = data.flexibleBucketCount ?? flexibleBucketCount;
+      flexibleBucketColors = Array.isArray(data.flexibleBucketColors) ? data.flexibleBucketColors : flexibleBucketColors;
 
       if (data.completedJournalSteps && typeof data.completedJournalSteps === "object") {
         completedJournalSteps = data.completedJournalSteps;
@@ -88,6 +100,7 @@
 
       colorGuideUnlocked = data.colorGuideUnlocked ?? (totalMixed > 0);
       activeJournalTab = data.activeJournalTab ?? activeJournalTab;
+      activeStoreSection = data.activeStoreSection ?? activeStoreSection;
 
       if (data.discoveredColors && typeof data.discoveredColors === "object") {
         Object.assign(discoveredColors, data.discoveredColors);

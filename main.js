@@ -29,3 +29,16 @@
       document.querySelector("#splashOverlay")?.classList.remove("open");
     });
   }
+document.querySelector("#godModeBtn")?.addEventListener("click", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    coins += 100;
+    renderAll();
+    saveState();
+    e.currentTarget.classList.remove("godPulse");
+    void e.currentTarget.offsetWidth;
+    e.currentTarget.classList.add("godPulse");
+    say("✦");
+  });
+
+  renderFlexibleBuckets();

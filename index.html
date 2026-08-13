@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-<title>Color Gather v0.34</title>
+<title>Color Gather v0.47</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,6 +15,13 @@
       <div id="bagContents" class="stashContents"></div>
     </div>
     <div class="panel">🪙 <span id="coins">0</span></div>
+  </div>
+
+  <div id="studioXpBar" class="studioXpBar">
+    <span id="studioLevel">⭐ Studio Lv 1</span>
+    <div class="studioXpTrack"><div id="studioXpFill" class="studioXpFill"></div></div>
+    <span id="studioXpText">0 / 25 XP</span>
+    <span id="studioXpFloat" class="studioXpFloat"></span>
   </div>
 
   <div id="quest" role="button" aria-label="Open Journal">
@@ -29,9 +36,7 @@
   </div>
 
   <div id="message"></div>
-  <div id="dropperFloater" class="dropperFloater">💧</div>
-
-  <div id="field">
+<div id="field">
     <div class="source" id="red" data-color="red">🔴<small>Tap</small></div>
     <div class="source" id="blue" data-color="blue" style="display:none;">🔵<small>Tap</small></div>
     <div class="source" id="yellow" data-color="yellow" style="display:none;">🟡<small>Tap</small></div>
@@ -43,8 +48,7 @@
     <div id="warehousePanel" class="panel">
       <div class="stashHeader">
         🎨 Mixer Vials <span id="storageText">0 / 1</span>
-        <span id="dropperChips" class="dropperChips"></span>
-      </div>
+</div>
       <div id="storageContents" class="stashContents"></div>
     </div>
   </div>
@@ -54,18 +58,18 @@
     <div class="toolRailSellGroup">
       <div class="toolRailRow">
         <button id="sellBtn" class="toolRailBtn">🪙<span>Sell</span></button>
-        <button id="sellAllBtn" class="toolRailBtn toolRailMini" style="display:none;">💰<span>Sell All</span></button>
-      </div>
+</div>
       <div id="sellAllChoices" class="sellAllChoices">
-        <button id="sellRawBtnRail" class="toolRailChoiceBtn">🎨<span>Tubes</span></button>
-        <button id="sellMixedBtnRail" class="toolRailChoiceBtn">🧪<span>Vials</span></button>
-        <button id="sellEverythingBtnRail" class="toolRailChoiceBtn">🪙<span>Everything</span></button>
+        <button id="sellRawBtnRail" class="toolRailChoiceBtn">🎨<span>Sell Tubes</span></button>
+        <button id="sellMixedBtnRail" class="toolRailChoiceBtn">🧪<span>Sell Vials</span></button>
+        <button id="sellEverythingBtnRail" class="toolRailChoiceBtn">💰<span>Sell All</span></button>
       </div>
     </div>
     <button id="storeBtn" class="toolRailBtn" style="display:none;">
       🏪<span>Store</span>
     </button>
     <button id="mixerToolBtn" class="toolRailBtn" style="display:none;">💧<span>Mix</span></button>
+    <button id="dollyToolBtn" class="toolRailBtn" style="display:none;">🛒<span>Dolly</span></button>
     <button id="fulfillBtn" class="toolRailBtn" style="display:none;">📦<span>Order</span></button>
   </div>
 
@@ -88,9 +92,27 @@
 
       <div id="journalProcessList"></div>
       <div id="colorGuidePanel" style="display:none;"></div>
-          <button id="journalResetBtn" class="journalResetBtn">🔄 Reset Progress</button>
+          <button id="godModeBtn" class="godModeBtn" title="Studio test button">✦</button>
+      <button id="journalResetBtn" class="journalResetBtn">🔄 Reset Progress</button>
     </div>
   </div>
+  <div id="majorNoticeOverlay" class="majorNoticeOverlay">
+    <div id="majorNoticeCard" class="majorNoticeCard notice-unlock">
+      <div id="majorNoticeIcon" class="majorNoticeIcon">🔓</div>
+      <div id="majorNoticeTitle" class="majorNoticeTitle">Unlocked!</div>
+      <div id="majorNoticeText" class="majorNoticeText"></div>
+      <button id="majorNoticeOkBtn" class="majorNoticeOkBtn">OK</button>
+    </div>
+  </div>
+
+  <div id="ordersOverlay" class="ordersOverlay">
+    <div class="ordersSheet">
+      <div class="ordersHeader"><span>📦 Orders</span><button id="ordersCloseBtn">Close</button></div>
+      <div class="ordersIntro">Pick the job you want. You can switch later.</div>
+      <div id="ordersChoices" class="ordersChoices"></div>
+</div>
+  </div>
+
   <div id="storeOverlay">
     <div id="storeSheet">
       <div id="storeHeader">
@@ -98,6 +120,11 @@
         <div id="storeHeaderBtns">
           <button id="storeCloseBtn">Close</button>
         </div>
+      </div>
+      <div id="storeSectionTabs" class="storeSectionTabs">
+        <button class="storeSectionBtn active" data-section="equipment">🧰 Equipment</button>
+        <button class="storeSectionBtn" data-section="tools">🔧 Tools</button>
+        <button class="storeSectionBtn" data-section="upgrades">⬆️ Upgrades</button>
       </div>
       <div id="storeTabs">
         <button id="storeTabBtn" class="storeTabBtn active">🛒 Store</button>
@@ -137,6 +164,8 @@
 <script src="minions.js"></script>
 <script src="dom.js"></script>
 <script src="effects.js"></script>
+<script src="xp.js"></script>
+<script src="color-xp.js"></script>
 <script src="inventory.js"></script>
 <script src="dropper.js"></script>
 <script src="sell.js"></script>

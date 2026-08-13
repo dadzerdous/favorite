@@ -18,6 +18,29 @@
     }
   }
 
+
+  const clickAudio = new Audio("sounds/click.wav");
+  clickAudio.preload = "auto";
+
+  function playClickSound() {
+    try {
+      clickAudio.currentTime = 0;
+      clickAudio.play().catch(() => {});
+    } catch (e) {}
+  }
+
+  const mixAudio = new Audio("sounds/fart.wav");
+  mixAudio.preload = "auto";
+
+  function playMixSound() {
+    try {
+      mixAudio.currentTime = 0;
+      mixAudio.play().catch(() => {});
+    } catch (e) {
+      // Audio may be blocked in some browser states; ignore gracefully.
+    }
+  }
+
   const sellChingAudio = new Audio("sounds/ching.wav");
   sellChingAudio.preload = "auto";
 
@@ -167,3 +190,80 @@ function paintSplatBurst(color) {
     }
   }
 
+
+
+  // =========================================================
+  // MAJOR NOTIFICATIONS
+  // Persistent, queued notices for meaningful progression events.
+  // =========================================================
+
+  const majorNoticeQueue = [];
+  let majorNoticeShowing = false;
+  let currentMajorNotice = null;
+
+  const majorNoticeDefaults = {
+    unlock:    { icon: "🔓", title: "New Unlock!" },
+    level:     { icon: "⭐", title: "Studio Level Up!" },
+    discovery: { icon: "🎨", title: "New Discovery!" },
+    reward:    { icon: "🎁", title: "Reward!" },
+    warning:   { icon: "⚠️", title: "Important" }
+  };
+
+  function showMajorNotice(type, text, options = {}) {
+    majorNoticeQueue.push({
+      type: majorNoticeDefaults[type] ? type : "unlock",
+      text,
+      title: options.title,
+      icon: options.icon
+    });
+    displayNextMajorNotice();
+  }
+
+  function displayNextMajorNotice() {
+    if (majorNoticeShowing || majorNoticeQueue.length === 0) return;
+
+    const notice = majorNoticeQueue.shift();
+    currentMajorNotice = notice;
+    const defaults = majorNoticeDefaults[notice.type];
+
+    const overlay = document.querySelector("#majorNoticeOverlay");
+    const card = document.querySelector("#majorNoticeCard");
+    const icon = document.querySelector("#majorNoticeIcon");
+    const title = document.querySelector("#majorNoticeTitle");
+    const text = document.querySelector("#majorNoticeText");
+
+    if (!overlay || !card || !icon || !title || !text) {
+      currentMajorNotice = null;
+      return;
+    }
+
+    majorNoticeShowing = true;
+    card.className = `majorNoticeCard notice-${notice.type}`;
+    icon.textContent = notice.icon || defaults.icon;
+    title.textContent = notice.title || defaults.title;
+    text.textContent = notice.text;
+    overlay.classList.add("open");
+  }
+
+  function closeMajorNotice() {
+    if (!majorNoticeShowing) return;
+
+    const overlay = document.querySelector("#majorNoticeOverlay");
+    majorNoticeShowing = false;
+    currentMajorNotice = null;
+    overlay?.classList.remove("open");
+
+    // Queue advances only after the current card is fully dismissed.
+    setTimeout(() => {
+      if (!majorNoticeShowing) displayNextMajorNotice();
+    }, 120);
+  }
+
+  // Delegated listener is resilient to re-rendering and guarantees one close path.
+  document.addEventListener("click", event => {
+    const okBtn = event.target.closest("#majorNoticeOkBtn");
+    if (!okBtn) return;
+    event.preventDefault();
+    event.stopPropagation();
+    closeMajorNotice();
+  });

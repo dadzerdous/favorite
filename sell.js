@@ -56,12 +56,12 @@
 
     const color = tube.color;
     const amount = tube.amount;
-    const fullBonus = amount >= bagCapacityPerTube ? (1 + tubeSellBonusLevel) : 0;
-    const earned = amount + fullBonus + studioEarningsBonus;
+    const earned = tubeSellValue(tube);
 
     coins += earned;
     totalSold += amount;
     totalTubesSold++;
+    if (amount >= bagCapacityPerTube) addStudioXp(3, "full tube");
     playSellSound();
 
     tube.color = null;
@@ -72,7 +72,7 @@
     renderAll();
     showSellHint(true);
 
-    checkQuests();
+    checkJournalSteps();
 
     if (navigator.vibrate) navigator.vibrate(24);
   }
@@ -91,59 +91,60 @@
     vial.amount = 0;
     coins += earned;
     totalSold += amount;
+    if (isFull) addStudioXp(5, "full vial");
     playSellSound();
 
     sellImpactAt(chipEl, isFull ? `+${earned} FULL!` : `+${earned}`);
     pulseCoins(earned);
     renderAll();
     showSellHint(true);
-    checkQuests();
+    checkJournalSteps();
     if (navigator.vibrate) navigator.vibrate([18, 18, 28]);
-  }
-
-  function openSellAllPicker() {
   }
 
   document.querySelector("#sellBtn").addEventListener("click", () => {
     sellMode = !sellMode;
+
     if (sellMode && dropperArmed) {
-      dropperIngredients.forEach(ingredient => {
-        if (ingredient.source === "tube") addToSlots(tubes, ingredient.color, 1, bagCapacityPerTube);
-      });
       dropperArmed = false;
       dropperIngredients = [];
     }
 
+    if (sellMode && dollyMode) {
+      dollyMode = false;
+    }
+
+    const choices = document.querySelector("#sellAllChoices");
+
     if (sellMode) {
+      choices?.classList.add("open");
       showSellHint(false);
     } else {
+      choices?.classList.remove("open");
       clearTimeout(message._timer);
       message.classList.remove("show", "dimmed");
-      document.querySelector("#sellAllChoices")?.classList.remove("open");
     }
 
     renderAll();
   });
-
-  document.querySelector("#sellAllBtn").addEventListener("click", openSellAllPicker);
 
 
   function sellAllTubesNow() {
     const base = tubesUsedTotal();
     if (base === 0) { say("No tube paint to sell"); return; }
 
-    let fullBonus = 0;
+    let earned = studioEarningsBonus;
     let tubesSoldNow = 0;
     tubes.forEach(t => {
       if (!t.color || t.amount <= 0) return;
       tubesSoldNow++;
-      if (t.amount >= bagCapacityPerTube) fullBonus += (1 + tubeSellBonusLevel);
+      earned += tubeSellValue(t) - studioEarningsBonus;
     });
-
-    const earned = base + fullBonus + studioEarningsBonus;
+    const fullTubeXp = tubes.filter(t => t.color && t.amount >= bagCapacityPerTube).length * 3;
     totalSold += base;
     totalTubesSold += tubesSoldNow;
     coins += earned;
+    if (fullTubeXp) addStudioXp(fullTubeXp, "full tubes");
     playSellSound();
     initTubes();
 
@@ -163,8 +164,10 @@
       if (!v.color || v.amount <= 0) return;
       earned += mixerVialSellValue(v.color, v.amount, v.amount >= storageCapacityPerVial);
     });
+    const fullVialXp = vials.filter(v => v.color && v.amount >= storageCapacityPerVial).length * 5;
     totalSold += base;
     coins += earned;
+    if (fullVialXp) addStudioXp(fullVialXp, "full vials");
     playSellSound();
     initVials();
 
@@ -181,13 +184,13 @@
 
     if (raw + mixed === 0) { say("Nothing to sell"); return; }
 
-    let fullTubeBonus = 0;
+    let tubeValue = 0;
     let tubesSoldNow = 0;
 
     tubes.forEach(t => {
       if (!t.color || t.amount <= 0) return;
       tubesSoldNow++;
-      if (t.amount >= bagCapacityPerTube) fullTubeBonus += (1 + tubeSellBonusLevel);
+      tubeValue += tubeSellValue(t) - studioEarningsBonus;
     });
 
     let mixedValue = 0;
@@ -196,10 +199,13 @@
       mixedValue += mixerVialSellValue(v.color, v.amount, v.amount >= storageCapacityPerVial);
     });
 
-    const earned = raw + fullTubeBonus + mixedValue + studioEarningsBonus;
+    const earned = tubeValue + mixedValue + studioEarningsBonus;
+    const fullTubeXp = tubes.filter(t => t.color && t.amount >= bagCapacityPerTube).length * 3;
+    const fullVialXp = vials.filter(v => v.color && v.amount >= storageCapacityPerVial).length * 5;
     totalSold += raw + mixed;
     totalTubesSold += tubesSoldNow;
     coins += earned;
+    if (fullTubeXp + fullVialXp) addStudioXp(fullTubeXp + fullVialXp, "full containers");
     playSellSound();
 
     initTubes();

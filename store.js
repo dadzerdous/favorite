@@ -80,6 +80,7 @@
         document.querySelector("#warehouseRow").style.display = "block";
         const mixerToolBtnEl = document.querySelector("#mixerToolBtn");
         if (mixerToolBtnEl) mixerToolBtnEl.style.display = "flex";
+        showMajorNotice("unlock", "The Mixer is now available in your Tools. Drag one paint bucket onto another to experiment.", { title: "Mixer Unlocked!", icon: "🎨" });
       }
     },
     {
@@ -112,8 +113,61 @@
       buy: function () {
         ordersUnlocked = true;
         this.level = 1;
+        currentOrder = null;
+        orderChoices = generateOrderChoices();
         document.querySelector("#order").style.display = "block";
         document.querySelector("#fulfillBtn").style.display = "block";
+        showMajorNotice("unlock","Orders are now available. Choose a Quick, Standard, or Big Job.",{title:"Orders Unlocked!",icon:"📦"});
+      }
+    },
+    {
+      id: "extraTubeSlot",
+      name: "Buy Another Tube",
+      level: 0,
+      maxLevel: 6,
+      baseCost: 18,
+      growth: 1.55,
+      visible: () => ordersUnlocked && TUBE_COUNT < 8,
+      desc: function () {
+        return `Adds another Tube to your Paint Case. You have ${TUBE_COUNT} now.`;
+      },
+      cost: function () { return Math.round(this.baseCost * Math.pow(this.growth, this.level)); },
+      buy: function () {
+        tubes.push({ color: null, amount: 0 });
+        TUBE_COUNT++;
+        this.level++;
+      }
+    },
+    {
+      id: "flexibleBucket",
+      name: "Flexible Mixing Bucket",
+      level: 0,
+      maxLevel: 3,
+      baseCost: 45,
+      growth: 1.8,
+      visible: () => proficientMixedColors().length > 0 && flexibleBucketCount < 3,
+      desc: () => "Holds one proficient mixed color. Empty it later to assign another.",
+      cost: function(){return Math.round(this.baseCost*Math.pow(this.growth,this.level));},
+      buy: function(){
+        flexibleBucketCount++; flexibleBucketColors.push(null); this.level++;
+        renderFlexibleBuckets();
+        showMajorNotice("unlock","An empty Flexible Mixing Bucket has been added to the canvas. Tap it to assign a proficient color.",{title:"Flexible Bucket Added!",icon:"🪣"});
+      }
+    },
+    {
+      id: "dolly",
+      name: "Studio Dolly",
+      level: 0,
+      maxLevel: 1,
+      baseCost: 35,
+      growth: 1,
+      visible: () => ordersUnlocked && !rearrangeUnlocked,
+      desc: () => "Unlocks Dolly mode so you can rearrange paint buckets around the canvas",
+      cost: function () { return this.baseCost; },
+      buy: function () {
+        rearrangeUnlocked = true;
+        this.level = 1;
+        showMajorNotice("unlock", "Dolly Mode is now available in your Tools. Use it to rearrange paint buckets.", { title: "Dolly Unlocked!", icon: "🛒" });
       }
     },
     {
@@ -123,7 +177,7 @@
       maxLevel: 5,
       baseCost: 20,
       growth: 1.55,
-      visible: () => ordersUnlocked && VIAL_COUNT < 6,
+      visible: () => ordersUnlocked && VIAL_COUNT >= 1 && VIAL_COUNT < 6,
       desc: function () {
         return `Adds another Mixer Vial. You have ${VIAL_COUNT} now.`;
       },
@@ -186,6 +240,7 @@
       buy: function () {
         whiteUnlocked = true;
         this.level = 1;
+        showMajorNotice("unlock", "White paint is now available, opening new light and pastel mixes.", { title: "White Paint Unlocked!", icon: "⚪" });
 
         const whiteEl = document.querySelector("#white");
         whiteEl.style.display = "grid";
@@ -258,7 +313,7 @@
       maxLevel: 5,
       baseCost: 30,
       growth: 1.7,
-      visible: () => ordersUnlocked,
+      visible: () => minionCount > 0,
       requires: () => minionCount > 0,
       lockedNote: "Hire a minion in the Store tab first",
       desc: function () { return `Minions gather quicker. Speed level ${this.level} / ${this.maxLevel}`; },
@@ -272,7 +327,7 @@
       maxLevel: 3,
       baseCost: 35,
       growth: 1.8,
-      visible: () => ordersUnlocked,
+      visible: () => minionCount > 0,
       requires: () => minionCount > 0,
       lockedNote: "Hire a minion in the Store tab first",
       desc: function () { return `Minions collect more per visit. Currently ${1 + this.level} at a time.`; },
@@ -361,6 +416,19 @@
     checkJournalSteps();
   }
 
+  function storeSectionForItem(item, list) {
+    if (list === toolUpgrades) return "upgrades";
+    const toolIds = new Set(["mixer", "unlockOrders", "dolly", "minion"]);
+    return toolIds.has(item.id) ? "tools" : "equipment";
+  }
+
+  function storeItemUnlockedForDisplay(item, list) {
+    if (!item.visible) return true;
+    if (item.visible()) return true;
+    if ((item.level || 0) > 0) return true;
+    return false;
+  }
+
   function renderUpgradeCard(item, list) {
     const maxed = item.maxLevel && item.level >= item.maxLevel;
     const locked = item.requires && !item.requires();
@@ -381,7 +449,9 @@
 
     const buyBtn = document.createElement("button");
     buyBtn.className = "upgradeBuyBtn";
-    buyBtn.textContent = soldOut ? "SOLD OUT" : maxed ? "✓" : `🪙 ${item.cost()}`;
+    const section = storeSectionForItem(item, list);
+    const ownedTool = section === "tools" && maxed;
+    buyBtn.textContent = soldOut ? "SOLD OUT" : ownedTool ? "OWNED" : maxed ? "MAX" : `🪙 ${item.cost()}`;
     const affordableNow = isStoreItemActuallyAffordable(item);
 
     buyBtn.disabled = !affordableNow;
@@ -398,23 +468,22 @@
   }
 
   function renderStore() {
-    const list = document.querySelector("#upgradeList");
-    list.innerHTML = "";
-
-    const allItems = activeStoreTab === "store" ? storeItems : toolUpgrades;
-    const items = allItems.filter(item => !item.visible || item.visible());
-
-    if (items.length === 0) {
-      const note = document.createElement("div");
-      note.id = "emptyTabNote";
-      note.textContent = activeStoreTab === "store"
-        ? "Nothing new to buy yet — keep playing!"
-        : "No tools owned yet — buy one in the Store tab to unlock its upgrades.";
-      list.appendChild(note);
-      return;
-    }
-
-    items.forEach(item => list.appendChild(renderUpgradeCard(item, allItems)));
+    const storeListEl = document.querySelector("#storeList");
+    if (!storeListEl) return;
+    storeListEl.innerHTML = "";
+    const allItems = [
+      ...storeItems.map(item => ({ item, list: storeItems })),
+      ...toolUpgrades.map(item => ({ item, list: toolUpgrades }))
+    ];
+    allItems
+      .filter(({ item, list }) => storeSectionForItem(item, list) === activeStoreSection)
+      .filter(({ item, list }) => storeItemUnlockedForDisplay(item, list))
+      .forEach(({ item, list }) => renderUpgradeCard(item, list));
+    document.querySelectorAll(".storeSectionBtn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.section === activeStoreSection);
+    });
+    const storeBtn = document.querySelector("#storeBtn");
+    if (storeBtn) storeBtn.classList.toggle("canAfford", cheapestAffordableExists());
   }
 
   function setStoreTab(tab) {
