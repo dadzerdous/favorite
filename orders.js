@@ -6,14 +6,20 @@
 
   document.querySelector("#fulfillBtn").addEventListener("click", () => {
     const neededColor = currentOrder.color;
-    const weight = weightOf(neededColor);
+    const vial = vials.find(v =>
+      v.color === neededColor &&
+      v.amount >= storageCapacityPerVial
+    );
 
-    if (!removeFromSlots(vials, neededColor, weight)) {
-      say(`Need ${colorInfo[neededColor].emoji} ${colorInfo[neededColor].label}`);
+    if (!vial) {
+      say(`Need 1 full ${colorInfo[neededColor].emoji} ${colorInfo[neededColor].label} Mixer Vial`);
       return;
     }
 
-    const earnedReward = currentOrder.reward + studioEarningsBonus;
+    vial.color = null;
+    vial.amount = 0;
+
+    const earnedReward = orderRewardForColor(neededColor) + studioEarningsBonus;
     coins += earnedReward;
     pulseCoins(earnedReward);
     totalFulfilled++;

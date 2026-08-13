@@ -66,9 +66,27 @@
     return colors;
   }
 
+  function mixedPaintPartValue(color) {
+    // Mixed paint is deliberately worth more than raw paint.
+    // A full starter secondary vial (4 parts) is worth 8 + a 2 coin full-vial bonus = 10.
+    return 2;
+  }
+
+  function fullMixerVialBonus() {
+    return 2 + vialSellBonusLevel;
+  }
+
+  function mixerVialSellValue(color, amount, isFull = false) {
+    return amount * mixedPaintPartValue(color) + (isFull ? fullMixerVialBonus() : 0);
+  }
+
+  function orderRewardForColor(color) {
+    // Orders pay a premium over simply selling the same full vial.
+    return mixerVialSellValue(color, storageCapacityPerVial, true) + 3;
+  }
+
   function makeOrder(color) {
-    const baseReward = { purple: 10, orange: 12, green: 12, pink: 14, skyblue: 14, cream: 14 };
-    return { color, reward: baseReward[color] || 10 };
+    return { color };
   }
 
   let currentOrder = makeOrder("purple");

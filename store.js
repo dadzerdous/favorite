@@ -117,6 +117,24 @@
       }
     },
     {
+      id: "extraMixerVial",
+      name: "Buy Another Mixer Vial",
+      level: 0,
+      maxLevel: 5,
+      baseCost: 20,
+      growth: 1.55,
+      visible: () => ordersUnlocked && VIAL_COUNT < 6,
+      desc: function () {
+        return `Adds another Mixer Vial. You have ${VIAL_COUNT} now.`;
+      },
+      cost: function () { return Math.round(this.baseCost * Math.pow(this.growth, this.level)); },
+      buy: function () {
+        vials.push({ color: null, amount: 0 });
+        VIAL_COUNT++;
+        this.level++;
+      }
+    },
+    {
       id: "tubeSlot",
       name: "Buy a Tube",
       level: 0,
@@ -287,7 +305,7 @@
       growth: 1.8,
       visible: () => mixerUnlocked && VIAL_COUNT >= 1,
       desc: function () {
-        return `Full Mixer Vial bonus: +${1 + vialSellBonusLevel} → +${2 + vialSellBonusLevel} coins`;
+        return `Full Mixer Vial bonus: +${2 + vialSellBonusLevel} → +${3 + vialSellBonusLevel} coins`;
       },
       cost: function () { return Math.round(this.baseCost * Math.pow(this.growth, this.level)); },
       buy: function () {

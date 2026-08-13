@@ -765,3 +765,34 @@ button:disabled { opacity: .4; }
 /* ---- v0.29 Store button is white unless something affordable exists ---- */
 #storeBtn { background: #fff !important; }
 #storeBtn.canAfford { background: #fff1a8 !important; }
+
+
+/* ---- v0.34 drag-to-mix ---- */
+.source.mixReady {
+  box-shadow:
+    0 6px 0 rgba(43,41,39,.15),
+    0 0 0 4px rgba(255,224,138,.42);
+}
+
+.source.mixDragging {
+  transform: scale(1.08);
+  cursor: grabbing;
+  box-shadow:
+    0 10px 0 rgba(43,41,39,.18),
+    0 0 0 6px rgba(255,224,138,.38);
+}
+
+.source.mixTarget {
+  animation: mixTargetPulse .55s ease-in-out infinite alternate;
+}
+
+@keyframes mixTargetPulse {
+  from {
+    transform: scale(1);
+    box-shadow: 0 6px 0 rgba(43,41,39,.15), 0 0 0 4px rgba(255,224,138,.35);
+  }
+  to {
+    transform: scale(1.09);
+    box-shadow: 0 6px 0 rgba(43,41,39,.15), 0 0 0 8px rgba(255,183,0,.18);
+  }
+}

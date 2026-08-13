@@ -84,8 +84,8 @@
     const chipEl = storageContents.children[index];
     const color = vial.color;
     const amount = vial.amount;
-    const fullBonus = amount >= storageCapacityPerVial ? (1 + vialSellBonusLevel) : 0;
-    const earned = amount + fullBonus;
+    const isFull = amount >= storageCapacityPerVial;
+    const earned = mixerVialSellValue(color, amount, isFull) + studioEarningsBonus;
 
     vial.color = null;
     vial.amount = 0;
@@ -93,7 +93,7 @@
     totalSold += amount;
     playSellSound();
 
-    sellImpactAt(chipEl, fullBonus ? `+${earned} FULL!` : `+${earned}`);
+    sellImpactAt(chipEl, isFull ? `+${earned} FULL!` : `+${earned}`);
     pulseCoins(earned);
     renderAll();
     showSellHint(true);
@@ -158,12 +158,11 @@
     const base = vialsUsedTotal();
     if (base === 0) { say("No vial paint to sell"); return; }
 
-    let fullBonus = 0;
+    let earned = studioEarningsBonus;
     vials.forEach(v => {
-      if (v.color && v.amount >= storageCapacityPerVial) fullBonus += (1 + vialSellBonusLevel);
+      if (!v.color || v.amount <= 0) return;
+      earned += mixerVialSellValue(v.color, v.amount, v.amount >= storageCapacityPerVial);
     });
-
-    const earned = base + fullBonus + studioEarningsBonus;
     totalSold += base;
     coins += earned;
     playSellSound();
@@ -182,20 +181,22 @@
 
     if (raw + mixed === 0) { say("Nothing to sell"); return; }
 
-    let fullBonus = 0;
+    let fullTubeBonus = 0;
     let tubesSoldNow = 0;
 
     tubes.forEach(t => {
       if (!t.color || t.amount <= 0) return;
       tubesSoldNow++;
-      if (t.amount >= bagCapacityPerTube) fullBonus += (1 + tubeSellBonusLevel);
+      if (t.amount >= bagCapacityPerTube) fullTubeBonus += (1 + tubeSellBonusLevel);
     });
 
+    let mixedValue = 0;
     vials.forEach(v => {
-      if (v.color && v.amount >= storageCapacityPerVial) fullBonus += (1 + vialSellBonusLevel);
+      if (!v.color || v.amount <= 0) return;
+      mixedValue += mixerVialSellValue(v.color, v.amount, v.amount >= storageCapacityPerVial);
     });
 
-    const earned = raw + mixed + fullBonus + studioEarningsBonus;
+    const earned = raw + fullTubeBonus + mixedValue + studioEarningsBonus;
     totalSold += raw + mixed;
     totalTubesSold += tubesSoldNow;
     coins += earned;

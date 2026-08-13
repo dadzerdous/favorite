@@ -1,122 +1,81 @@
-// Mixer/dropper selection and mixing state machine.
+// Mixer mode: drag one paint bucket onto another, then snap it back.
 
-  // =========================================================
-  // DROPPER — pick it up, tap 2 colors (bucket or tube), it mixes itself
-  // =========================================================
-
-  function toggleDropper(event) {
+  function toggleDropper() {
     if (!mixerUnlocked) return;
-    if (sellMode) sellMode = false;
+
+    if (sellMode) {
+      sellMode = false;
+      document.querySelector("#sellAllChoices")?.classList.remove("open");
+    }
+
+    dropperArmed = !dropperArmed;
+    dropperIngredients = [];
+
     if (dropperArmed) {
-      // cancelling: hand back anything pulled from a tube (field-collected drops are just lost)
-      dropperIngredients.forEach(ingredient => {
-        if (ingredient.source === "tube") addToSlots(tubes, ingredient.color, 1, bagCapacityPerTube);
-      });
-      dropperArmed = false;
-      dropperIngredients = [];
-    } else {
-      dropperArmed = true;
-      dropperIngredients = [];
-      if (event && event.currentTarget) positionDropperFloaterAtElement(event.currentTarget);
+      if (VIAL_COUNT <= 0) {
+        dropperArmed = false;
+        say("Buy a Mixer Vial first");
+      } else {
+        say("Drag one paint bucket onto another to mix");
+      }
     }
+
     renderAll();
   }
 
-  function feedDropperFromTube(index, event) {
-    if (!dropperArmed) return;
-
-    const tube = tubes[index];
-    if (!tube.color || tube.amount <= 0) return;
-
-    const color = tube.color;
-    tube.amount--;
-    if (tube.amount === 0) tube.color = null;
-
-    if (event && event.currentTarget) positionDropperFloaterAtElement(event.currentTarget);
-    addIngredientToDropper(color, "tube");
-  }
-
-  function feedDropperFromField(source) {
-    if (!dropperArmed) return;
-    positionDropperFloaterAtElement(source);
-    addIngredientToDropper(source.dataset.color, "field");
-    spawnFloater(source, `💧 ${colorInfo[source.dataset.color].emoji}`);
-  }
-
-  function addIngredientToDropper(color, source) {
-    dropperIngredients.push({ color, source });
-    renderAll();
-
-    if (navigator.vibrate) navigator.vibrate(10);
-
-    if (dropperIngredients.length === 2) resolveDropperMix();
-  }
-
-  function resolveDropperMix() {
-    const [first, second] = dropperIngredients;
-    const recipe = findRecipeForPair(first.color, second.color);
-
-    function returnTubeIngredients() {
-      dropperIngredients.forEach(ingredient => {
-        if (ingredient.source === "tube") addToSlots(tubes, ingredient.color, 1, bagCapacityPerTube);
-      });
-    }
+  function resolveBucketDragMix(firstSource, secondSource) {
+    const colorA = firstSource.dataset.color;
+    const colorB = secondSource.dataset.color;
+    const recipe = findRecipeForPair(colorA, colorB);
 
     if (!recipe) {
       say("That combo doesn't mix");
-      returnTubeIngredients();
-      dropperArmed = false;
-      dropperIngredients = [];
-      renderAll();
       return;
     }
 
     const weight = weightOf(recipe.result);
 
     if (!canAddToSlots(vials, recipe.result, weight, storageCapacityPerVial)) {
-      say(`🧪 ${colorInfo[recipe.result].label} vial full!`);
-      returnTubeIngredients();
-      dropperArmed = false;
-      dropperIngredients = [];
-      renderAll();
+      say(`🧪 No Mixer Vial room for ${colorInfo[recipe.result].label}`);
       return;
     }
 
     addToSlots(vials, recipe.result, weight, storageCapacityPerVial);
     totalMixed++;
     recordColorDiscovery(recipe.result);
-    dropperArmed = false;
-    dropperIngredients = [];
 
     paintSplatBurst(recipe.result);
     playSplatSound();
     say(`${colorInfo[recipe.result].emoji} Made ${colorInfo[recipe.result].label}!`);
+
     renderAll();
     checkQuests();
 
-    if (navigator.vibrate) navigator.vibrate(28);
+    if (navigator.vibrate) navigator.vibrate([24, 15, 30]);
   }
 
   dropperToggle.addEventListener("click", toggleDropper);
-
 
   field.addEventListener("pointerdown", event => {
     const choices = document.querySelector("#sellAllChoices");
     if (!choices || !choices.classList.contains("open")) return;
 
-    // Clicking the open canvas closes only the Sell All submenu.
-    if (!event.target.closest(".source") && !event.target.closest(".toolRailBtn") && !event.target.closest(".toolRailChoiceBtn")) {
+    if (!event.target.closest(".source") &&
+        !event.target.closest(".toolRailBtn") &&
+        !event.target.closest(".toolRailChoiceBtn")) {
       choices.classList.remove("open");
     }
   });
 
-  // =========================================================
-  // RAW COLOR INPUT — tap to gather, hold to rearrange
-  // =========================================================
-
   document.querySelectorAll(".source[data-color]").forEach(source => {
     source.addEventListener("pointerdown", event => {
       event.preventDefault();
+
+      if (dropperArmed && !sellMode) {
+        beginMixerBucketDrag(source, event);
+        return;
+      }
+
       source.classList.add("pressed");
 
       const startX = event.clientX;
@@ -147,9 +106,9 @@
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
         source.classList.remove("pressed");
+
         if (!longPressFired && !moved) {
           if (sellMode) {
-            const color = source.dataset.color;
             const earned = 1 + studioEarningsBonus;
             coins += earned;
             totalSold += 1;
@@ -160,7 +119,7 @@
             source.classList.add("sellBucketHint");
 
             pulseCoins(earned);
-            renderAll();              // updates the visible coin total immediately
+            renderAll();
             showSellHint(false);
 
             setTimeout(() => {
@@ -169,8 +128,6 @@
             }, 650);
 
             checkJournalSteps();
-          } else if (dropperArmed) {
-            feedDropperFromField(source);
           } else {
             tapSource(source, false);
           }
@@ -182,3 +139,68 @@
     });
   });
 
+  function beginMixerBucketDrag(source, startEvent) {
+    if (!dropperArmed || source.style.display === "none") return;
+
+    const fieldRect = field.getBoundingClientRect();
+    const startRect = source.getBoundingClientRect();
+
+    const originalLeft = source.style.left;
+    const originalTop = source.style.top;
+    const originalZ = source.style.zIndex;
+
+    const pointerOffsetX = startEvent.clientX - startRect.left;
+    const pointerOffsetY = startEvent.clientY - startRect.top;
+
+    source.classList.add("mixDragging");
+    source.style.zIndex = "40";
+
+    function onMove(event) {
+      const left = clamp(event.clientX - fieldRect.left - pointerOffsetX, 0, fieldRect.width - source.offsetWidth);
+      const top = clamp(event.clientY - fieldRect.top - pointerOffsetY, 0, fieldRect.height - source.offsetHeight);
+
+      source.style.left = `${left}px`;
+      source.style.top = `${top}px`;
+
+      document.querySelectorAll(".source[data-color]").forEach(other => {
+        if (other === source || other.style.display === "none") {
+          other.classList.remove("mixTarget");
+          return;
+        }
+
+        const a = source.getBoundingClientRect();
+        const b = other.getBoundingClientRect();
+        const overlaps = a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        other.classList.toggle("mixTarget", overlaps);
+      });
+    }
+
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+
+      let target = null;
+
+      document.querySelectorAll(".source[data-color]").forEach(other => {
+        if (other !== source && other.classList.contains("mixTarget")) target = other;
+        other.classList.remove("mixTarget");
+      });
+
+      source.classList.remove("mixDragging");
+
+      // Snap back to exactly where the bucket started.
+      source.style.transition = "left .28s ease, top .28s ease, transform .12s ease";
+      source.style.left = originalLeft;
+      source.style.top = originalTop;
+      source.style.zIndex = originalZ;
+
+      setTimeout(() => {
+        source.style.transition = "";
+      }, 300);
+
+      if (target) resolveBucketDragMix(source, target);
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }

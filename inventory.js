@@ -36,8 +36,7 @@
         chip.className = "stashChip"
           + (sellMode ? " sellable" : "")
           + (sellMode && isFull ? " fullVial" : "");
-        const vialFullBonus = isFull ? (1 + vialSellBonusLevel) : 0;
-        const vialValue = vial.amount + vialFullBonus + studioEarningsBonus;
+        const vialValue = mixerVialSellValue(vial.color, vial.amount, isFull) + studioEarningsBonus;
         chip.textContent = sellMode
           ? `${colorInfo[vial.color].emoji} ${colorInfo[vial.color].label} ${vial.amount}/${storageCapacityPerVial} · 🪙${vialValue}`
           : `${colorInfo[vial.color].emoji} ${colorInfo[vial.color].label} ${vial.amount}/${storageCapacityPerVial}`;
@@ -51,16 +50,14 @@
   }
 
   function renderDropper() {
-    dropperToggle.innerHTML = dropperArmed ? "❌<span>Done</span>" : "💧<span>Mix</span>";
+    dropperToggle.innerHTML = dropperArmed ? "❌<span>Done</span>" : "🎨<span>Mix</span>";
     dropperToggle.classList.toggle("armed", dropperArmed);
-    dropperFloaterEl.classList.toggle("visible", dropperArmed);
-
+    dropperFloaterEl.classList.remove("visible");
     dropperChips.innerHTML = "";
-    dropperIngredients.forEach(ingredient => {
-      const chip = document.createElement("span");
-      chip.className = "mixChip";
-      chip.textContent = colorInfo[ingredient.color].emoji;
-      dropperChips.appendChild(chip);
+
+    document.querySelectorAll(".source[data-color]").forEach(source => {
+      const active = dropperArmed && source.style.display !== "none";
+      source.classList.toggle("mixReady", active);
     });
   }
 
@@ -75,7 +72,7 @@
   }
 
   document.addEventListener("pointermove", event => {
-    if (dropperArmed) positionDropperFloaterAtPoint(event.clientX, event.clientY);
+    // Bucket-drag mixing no longer uses the old floating dropper cursor.
   });
 
   function renderAll() {
@@ -84,8 +81,8 @@
     coinsEl.textContent = coins;
 
     const orderInfo = colorInfo[currentOrder.color];
-    orderTarget.textContent = `${orderInfo.emoji} ${orderInfo.label} ×1`;
-    rewardEl.textContent = currentOrder.reward;
+    orderTarget.textContent = `1 ${orderInfo.emoji} ${orderInfo.label} Mixer Vial`;
+    rewardEl.textContent = orderRewardForColor(currentOrder.color);
 
     renderBackpack();
     renderWarehouse();
@@ -178,7 +175,6 @@
     source.classList.add("pop");
 
     spawnFloater(source, `+1 ${colorInfo[color].emoji}`);
-    if (!fromMinion) createCanvasTapSplat(source, color);
     renderAll();
     checkQuests();
 
