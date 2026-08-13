@@ -1,943 +1,149 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>pire O55nline</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            background: #000;
-            font-family: 'Courier New', monospace;
-            color: white;
-            overflow: hidden;
-            height: 100vh;
-            width: 100vw;
-        }
-
-        /* ── SPLASH SCREEN ── */
-        #splash {
-            position: fixed;
-            inset: 0;
-            background: #0a0a1a;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            z-index: 100;
-            overflow-y: auto;
-            padding: 20px;
-        }
-
-        #splash h1 {
-            font-size: clamp(28px, 6vw, 52px);
-            color: #ffcc00;
-            text-shadow: 0 0 20px #ff8800;
-            margin: 20px 0 10px;
-            letter-spacing: 4px;
-        }
-
-        #splash .subtitle {
-            color: #00ffcc;
-            font-size: 13px;
-            letter-spacing: 2px;
-            margin-bottom: 24px;
-        }
-
-        /* Tab bar */
-        .tab-bar {
-            display: flex;
-            gap: 4px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #333;
-            width: 100%;
-            max-width: 500px;
-        }
-
-        .tab-btn {
-            flex: 1;
-            background: transparent;
-            border: none;
-            border-bottom: 3px solid transparent;
-            color: #888;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            padding: 8px 4px;
-            cursor: pointer;
-            letter-spacing: 1px;
-            transition: 0.2s;
-        }
-
-        .tab-btn.active {
-            color: #ffcc00;
-            border-bottom-color: #ffcc00;
-        }
-
-        .tab-content {
-            display: none;
-            width: 100%;
-            max-width: 500px;
-            animation: fadeIn 0.2s ease;
-        }
-
-        .tab-content.active { display: block; }
-
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        /* ── INSTRUCTIONS TAB ── */
-        .instructions {
-            background: #111;
-            border: 1px solid #333;
-            padding: 16px;
-            font-size: 13px;
-            line-height: 2;
-        }
-
-        .instructions h3 {
-            color: #ffcc00;
-            margin: 12px 0 4px;
-            font-size: 13px;
-            letter-spacing: 2px;
-        }
-
-        .instructions p { color: #ccc; }
-
-        .inst-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-top: 8px;
-        }
-
-        .inst-box {
-            background: #1a1a2e;
-            border: 1px solid #333;
-            padding: 10px;
-            font-size: 12px;
-            color: #aaa;
-        }
-
-        .inst-box strong { color: #00ffcc; display: block; margin-bottom: 4px; }
-
-        /* ── CHARACTER SELECT TAB ── */
-        .class-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-bottom: 16px;
-        }
-
-        .class-card {
-            background: #111;
-            border: 2px solid #333;
-            padding: 16px 8px;
-            text-align: center;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-
-        .class-card:hover, .class-card.selected {
-            border-color: #ffcc00;
-            background: #1a1a00;
-        }
-
-        .class-card .emoji { font-size: 36px; display: block; margin-bottom: 6px; }
-        .class-card .cname { color: #ffcc00; font-size: 13px; font-weight: bold; letter-spacing: 1px; }
-        .class-card .cdesc { color: #888; font-size: 10px; margin-top: 4px; line-height: 1.4; }
-
-        .class-stats {
-            display: none;
-            background: #111;
-            border: 1px solid #333;
-            padding: 12px;
-            margin-bottom: 12px;
-            font-size: 12px;
-        }
-
-        .class-stats.visible { display: block; }
-        .class-stats h4 { color: #00ffcc; margin-bottom: 8px; letter-spacing: 1px; }
-
-        .stat-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 4px 0;
-        }
-
-        .stat-label { width: 32px; color: #888; font-size: 11px; }
-
-        .stat-bar-bg {
-            flex: 1;
-            height: 6px;
-            background: #222;
-            border-radius: 3px;
-        }
-
-        .stat-bar-fill {
-            height: 100%;
-            border-radius: 3px;
-            background: #ffcc00;
-            transition: width 0.3s;
-        }
-
-        .stat-val { width: 20px; text-align: right; color: #fff; font-size: 11px; }
-
-        /* ── PLAY BUTTON ── */
-        .play-btn {
-            width: 100%;
-            padding: 14px;
-            background: #ffcc00;
-            color: #000;
-            border: none;
-            font-family: 'Courier New', monospace;
-            font-size: 18px;
-            font-weight: bold;
-            letter-spacing: 3px;
-            cursor: pointer;
-            margin-top: 8px;
-            transition: 0.15s;
-        }
-
-        .play-btn:hover { background: #fff; }
-        .play-btn:disabled { background: #444; color: #666; cursor: not-allowed; }
-
-        .continue-btn {
-            width: 100%;
-            padding: 10px;
-            background: transparent;
-            color: #00ffcc;
-            border: 2px solid #00ffcc;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            letter-spacing: 2px;
-            cursor: pointer;
-            margin-top: 8px;
-            transition: 0.15s;
-        }
-
-        .continue-btn:hover { background: #00ffcc22; }
-
-        .delete-btn {
-            width: 100%;
-            padding: 8px;
-            background: transparent;
-            color: #ff4444;
-            border: 1px solid #ff4444;
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            cursor: pointer;
-            margin-top: 6px;
-        }
-
-        /* ── GAME LAYOUT ── */
-#game-layout {
-    display: none;
-    width: 100vw;
-    height: 100vh;
-    position: relative;
-    overflow: hidden;
-}
-
-#canvas-wrap {
-    position: absolute;
-    top: 0; left: 0; bottom: 0;
-    right: 0;
-    transition: right 0.25s ease;
-    overflow: hidden;
-}
-
-#game-layout.panel-open #canvas-wrap {
-    right: 220px;
-}
-
-#gameCanvas {
-    display: block;
-    width: 100%;
-    height: 100%;
-}
-
-#stats-panel {
-    position: absolute;
-    top: 0;
-    right: -220px;
-    width: 220px;
-    height: 100%;
-    background: #0d0d1a;
-    border-left: 2px solid #333;
-    overflow-y: auto;
-    transition: right 0.25s ease;
-    z-index: 20;
-    padding: 10px 10px 80px;
-}
-
-#stats-panel.open { right: 0; }
-
-#panel-toggle {
-    position: absolute;
-    top: 50%;
-    right: 0;
-    transform: translateY(-50%);
-    background: #1a1a2e;
-    border: 2px solid #333;
-    border-right: none;
-    color: white;
-    padding: 10px 6px;
-    cursor: pointer;
-    z-index: 21;
-    transition: right 0.25s ease;
-    writing-mode: vertical-rl;
-    letter-spacing: 2px;
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-}
-
-#panel-toggle.open { right: 220px; }
-
-        .panel-section {
-            margin-bottom: 14px;
-            border-bottom: 1px solid #222;
-            padding-bottom: 10px;
-        }
-
-        .panel-section h3 {
-            color: #ffcc00;
-            font-size: 11px;
-            letter-spacing: 2px;
-            margin-bottom: 8px;
-        }
-
-        .panel-stat-row {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin: 5px 0;
-        }
-
-        .panel-stat-label {
-            width: 36px;
-            font-size: 11px;
-            color: #888;
-        }
-
-        .panel-stat-bar {
-            flex: 1;
-            height: 5px;
-            background: #222;
-            border-radius: 2px;
-        }
-
-        .panel-stat-fill {
-            height: 100%;
-            border-radius: 2px;
-            background: #ffcc00;
-        }
-
-        .panel-stat-val {
-            width: 22px;
-            text-align: right;
-            font-size: 11px;
-            color: #fff;
-        }
-
-        .panel-plus-btn {
-            background: #333;
-            border: 1px solid #555;
-            color: #ffcc00;
-            font-size: 14px;
-            width: 22px;
-            height: 22px;
-            cursor: pointer;
-            line-height: 1;
-            padding: 0;
-            font-family: monospace;
-        }
-
-        .panel-plus-btn:disabled { color: #333; border-color: #222; cursor: not-allowed; }
-        .panel-plus-btn:not(:disabled):hover { background: #ffcc00; color: #000; }
-
-        .skill-panel-row {
-            background: #111;
-            border: 1px solid #222;
-            padding: 8px;
-            margin: 5px 0;
-            position: relative;
-        }
-
-        .skill-panel-row.unlocked { border-color: #444; }
-        .skill-panel-row.maxed { border-color: #ffcc00; }
-
-        .skill-panel-header {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 4px;
-        }
-
-        .skill-icon { font-size: 18px; }
-
-        .skill-name {
-            font-size: 11px;
-            color: #ccc;
-            font-weight: bold;
-            flex: 1;
-        }
-
-        .skill-tier-label {
-            font-size: 10px;
-            color: #888;
-        }
-
-        .skill-desc {
-            font-size: 10px;
-            color: #666;
-            margin-bottom: 6px;
-            line-height: 1.4;
-        }
-
-        .skill-upgrade-btn {
-            width: 100%;
-            padding: 4px;
-            background: #1a1a00;
-            border: 1px solid #ffcc00;
-            color: #ffcc00;
-            font-family: 'Courier New', monospace;
-            font-size: 10px;
-            cursor: pointer;
-            letter-spacing: 1px;
-        }
-
-        .skill-upgrade-btn:disabled {
-            border-color: #333;
-            color: #444;
-            background: #111;
-            cursor: not-allowed;
-        }
-
-        .skill-upgrade-btn:not(:disabled):hover {
-            background: #ffcc00;
-            color: #000;
-        }
-
-        .tier-pips {
-            display: flex;
-            gap: 3px;
-            margin-top: 4px;
-        }
-
-        .pip {
-            width: 10px;
-            height: 4px;
-            background: #333;
-            border-radius: 2px;
-        }
-
-        .pip.filled { background: #ffcc00; }
-
-        /* ── OVERLAYS (shop, skills, stats menus) ── */
-        .menu {
-            pointer-events: all;
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.95);
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 50;
-            overflow-y: auto;
-            padding: 20px;
-        }
-
-        .menu h1 {
-            font-size: clamp(20px, 4vw, 32px);
-            margin-bottom: 16px;
-            letter-spacing: 3px;
-        }
-
-        .shop-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            width: 100%;
-            max-width: 400px;
-            margin-bottom: 16px;
-        }
-
-        .shop-item {
-            border: 1px solid #444;
-            padding: 14px;
-            text-align: center;
-            transition: 0.2s;
-        }
-
-        .shop-item:hover { border-color: yellow; background: #1a1a00; }
-        .shop-item h3 { font-size: 13px; margin-bottom: 4px; }
-        .shop-item p { font-size: 11px; color: #888; margin-bottom: 8px; }
-
-        .buy-btn {
-            background: gold;
-            color: black;
-            border: none;
-            padding: 6px 14px;
-            cursor: pointer;
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            font-size: 12px;
-        }
-
-        .buy-btn:hover { background: #fff; }
-
-        .hud-btn {
-            border: 2px solid white;
-            background: rgba(0,0,0,0.5);
-            color: white;
-            padding: 10px 20px;
-            cursor: pointer;
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            font-size: 13px;
-            letter-spacing: 1px;
-        }
-
-        .hud-btn:hover { background: white; color: black; }
-
-        /* ── UI LAYER (in-game HUD elements that are HTML) ── */
-        #ui-layer {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-        }
-
-        /* ── SCROLLBAR STYLE ── */
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: #111; }
-        ::-webkit-scrollbar-thumb { background: #333; }
-    </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Color Gather v0.31</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="game">
 
-<!-- ════════════════════════════════════════
-     SPLASH SCREEN
-════════════════════════════════════════ -->
-<div id="splash">
-    <h1>⚔ SPIRE ONLINE</h1>
-    <p class="subtitle">MULTIPLAYER GAUNTLET RPG</p>
-
-    <div class="tab-bar">
-        <button class="tab-btn active" onclick="showTab('tab-instructions')">📖 HOW TO PLAY</button>
-        <button class="tab-btn" onclick="showTab('tab-select')">⚔️ NEW GAME</button>
-        <button class="tab-btn" id="continue-tab-btn" onclick="showTab('tab-continue')" style="display:none">▶ CONTINUE</button>
+  <div class="top">
+    <div id="backpackPanel" class="panel">
+      <div class="stashHeader">🎨 Paint Case <span id="bagText">0 / 1</span></div>
+      <div id="bagContents" class="stashContents"></div>
     </div>
+    <div class="panel">🪙 <span id="coins">0</span></div>
+  </div>
 
-    <!-- INSTRUCTIONS -->
-    <div id="tab-instructions" class="tab-content active">
-        <div class="instructions">
-            <h3>🎮 MOVEMENT</h3>
-            <p>Mobile: drag anywhere to move your hero.<br>
-               Desktop: WASD or Arrow Keys.</p>
+  <div id="quest" role="button" aria-label="Open Journal">
+    <span id="questText">📖 Process 1 — My First Paint: Gather 4 Red paint</span>
+    <span id="questProgress">0 / 4</span>
+  </div>
 
-            <h3>⚔️ COMBAT</h3>
-            <p>Your hero auto-attacks the nearest enemy.<br>
-               Use skills to deal extra damage and survive.</p>
+  <div id="order" style="display:none;">
+    ORDER
+    <div id="orderTarget">🟣 Purple ×1</div>
+    <div style="font-size:12px;font-weight:700;">Reward: 🪙 <span id="reward">10</span></div>
+  </div>
 
-            <h3>✨ SKILLS</h3>
-            <p>4 skills shown at the bottom of the screen.<br>
-               Tap a skill button to activate it.<br>
-               Desktop: press 1 2 3 4.<br>
-               Unlock and upgrade skills with Skill Tokens.</p>
+  <div id="message"></div>
+  <div id="dropperFloater" class="dropperFloater">💧</div>
 
-            <h3>📈 PROGRESSION</h3>
-            <div class="inst-grid">
-                <div class="inst-box">
-                    <strong>Kill Enemies</strong>
-                    Earn XP and Gold
-                </div>
-                <div class="inst-box">
-                    <strong>Level Up</strong>
-                    +1 Stat Point per level.<br>Every 3 levels: +1 Skill Token
-                </div>
-                <div class="inst-box">
-                    <strong>Stat Points</strong>
-                    Upgrade STR DEX CON INT WIS in the side panel →
-                </div>
-                <div class="inst-box">
-                    <strong>Skill Tokens</strong>
-                    Upgrade skills up to Tier 3 in the side panel →
-                </div>
-            </div>
+  <div id="field">
+    <div class="source" id="red" data-color="red">🔴<small>Tap</small></div>
+    <div class="source" id="blue" data-color="blue" style="display:none;">🔵<small>Tap</small></div>
+    <div class="source" id="yellow" data-color="yellow" style="display:none;">🟡<small>Tap</small></div>
+    <div class="source" id="white" data-color="white" style="display:none;">⚪<small>Tap</small></div>
+    <div class="source emptyPrimaryBucket" id="emptyPrimaryBucket" style="display:none;">🪣<small>Empty</small></div>
+  </div>
 
-            <h3>🏪 HUB</h3>
-            <p>Between waves you enter the Hub.<br>
-               Walk into glowing circles to open the Shop,<br>
-               Skill Trainer, or Stat Mirror.<br>
-               Walk to the north portal when ready for the next wave.</p>
-
-            <h3>⚠️ WAVES</h3>
-            <p>Every 5 waves: Mini-Boss appears.<br>
-               Every 10 waves: Boss wave. Survive!</p>
-        </div>
-        <button class="play-btn" style="margin-top:16px" onclick="showTab('tab-select')">
-            SELECT CLASS →
-        </button>
+  <div id="warehouseRow" style="display:none;">
+    <div id="warehousePanel" class="panel">
+      <div class="stashHeader">
+        🎨 Mixer Vials <span id="storageText">0 / 1</span>
+        <span id="dropperChips" class="dropperChips"></span>
+      </div>
+      <div id="storageContents" class="stashContents"></div>
     </div>
+  </div>
 
-    <!-- CHARACTER SELECT -->
-    <div id="tab-select" class="tab-content">
-        <div class="class-grid" id="class-grid">
-            <!-- filled by JS -->
-        </div>
-        <div class="class-stats" id="class-stats-preview">
-            <h4 id="preview-name">SELECT A CLASS</h4>
-            <div id="preview-stats"></div>
-            <div id="preview-skills" style="margin-top:10px; font-size:11px; color:#888; line-height:2"></div>
-        </div>
-        <div style="margin-bottom:12px">
-    <label style="font-size:12px;color:#888;letter-spacing:1px;display:block;margin-bottom:6px">
-        HERO NAME (8 chars, no spaces)
-    </label>
-    <input 
-        id="hero-name-input"
-        maxlength="8"
-        placeholder="HERO"
-        style="
-            background:#111;
-            border:2px solid #333;
-            color:#ffcc00;
-            font-family:'Courier New',monospace;
-            font-size:16px;
-            padding:8px 12px;
-            width:100%;
-            letter-spacing:2px;
-            text-transform:uppercase;
-        "
-        oninput="this.value = this.value.replace(/\s/g,'').toUpperCase().slice(0,8)"
-    />
-</div>
-        <button class="play-btn" id="play-btn" disabled onclick="startNewGame()">
-            SELECT A CLASS TO BEGIN
-        </button>
+  <div id="toolsRail" aria-label="Studio tools">
+    <button id="journalBtn" class="toolRailBtn">📖<span>Journal</span></button>
+    <div class="toolRailSellGroup">
+      <div class="toolRailRow">
+        <button id="sellBtn" class="toolRailBtn">🪙<span>Sell</span></button>
+        <button id="sellAllBtn" class="toolRailBtn toolRailMini" style="display:none;">💰<span>Sell All</span></button>
+      </div>
+      <div id="sellAllChoices" class="sellAllChoices">
+        <button id="sellRawBtnRail" class="toolRailChoiceBtn">🎨<span>Tubes</span></button>
+        <button id="sellMixedBtnRail" class="toolRailChoiceBtn">🧪<span>Vials</span></button>
+        <button id="sellEverythingBtnRail" class="toolRailChoiceBtn">🪙<span>Everything</span></button>
+      </div>
     </div>
+    <button id="storeBtn" class="toolRailBtn" style="display:none;">
+      🏪<span>Store</span>
+    </button>
+    <button id="mixerToolBtn" class="toolRailBtn" style="display:none;">💧<span>Mix</span></button>
+    <button id="fulfillBtn" class="toolRailBtn" style="display:none;">📦<span>Order</span></button>
+  </div>
 
-    <!-- CONTINUE -->
-    <div id="tab-continue" class="tab-content">
-        <div id="save-summary" style="background:#111;border:1px solid #333;padding:16px;margin-bottom:12px;font-size:13px;line-height:2"></div>
-        <button class="continue-btn" onclick="continueGame()">▶ CONTINUE</button>
-        <button class="delete-btn" onclick="deleteSave()">✕ DELETE SAVE &amp; START OVER</button>
+
+
+  <div id="journalOverlay">
+    <div id="journalSheet">
+      <div id="journalHeader">
+        <div>
+          <div id="journalTitle">📖 Studio Journal</div>
+          <div id="journalSubtitle">Choose what you want to work on.</div>
+        </div>
+        <button id="journalCloseBtn">Close</button>
+      </div>
+
+      <div id="journalTabs">
+        <button id="journalProcessesTab" class="journalTabBtn active">📋 Processes</button>
+        <button id="journalGuideTab" class="journalTabBtn" style="display:none;">🎨 Color Guide</button>
+      </div>
+
+      <div id="journalProcessList"></div>
+      <div id="colorGuidePanel" style="display:none;"></div>
+          <button id="journalResetBtn" class="journalResetBtn">🔄 Reset Progress</button>
     </div>
-</div>
-
-<!-- ════════════════════════════════════════
-     GAME LAYOUT
-════════════════════════════════════════ -->
-<div id="game-layout">
-
-    <!-- Canvas area -->
-    <div id="canvas-wrap">
-        <div id="ui-layer">
-            <!-- In-game HTML menus -->
-            <div id="shop-menu" class="menu">
-                <h1 style="color:yellow">🛒 MERCHANT</h1>
-                <p style="margin-bottom:12px">Gold: <span id="shop-gold">0</span></p>
-                <div class="shop-grid" id="shop-grid">
-                    <div class="shop-item">
-                        <h3>❤️ Potion</h3>
-                        <p>Heal 5 HP</p>
-                        <button class="buy-btn" onclick="buyItem('potion')">50g</button>
-                    </div>
-                    <div class="shop-item">
-                        <h3>⚔️ Sharpen</h3>
-                        <p>+1 Base Damage</p>
-                        <button class="buy-btn" onclick="buyItem('damage')">100g</button>
-                    </div>
-                    <div class="shop-item">
-                        <h3>💨 Haste</h3>
-                        <p>+1 Fire Rate</p>
-                        <button class="buy-btn" onclick="buyItem('firerate')">80g</button>
-                    </div>
-                    <div class="shop-item">
-                        <h3>🛡️ Plating</h3>
-                        <p>+5 Max HP</p>
-                        <button class="buy-btn" onclick="buyItem('maxhp')">120g</button>
-                    </div>
-                    <div class="shop-item">
-                        <h3>💣 Bomb</h3>
-                        <p>AOE — use next wave</p>
-                        <button class="buy-btn" onclick="buyItem('bomb')">60g</button>
-                    </div>
-                    <div class="shop-item">
-                        <h3>⚡ Energize</h3>
-                        <p>Reset all cooldowns</p>
-                        <button class="buy-btn" onclick="buyItem('reset')">150g</button>
-                    </div>
-                </div>
-                <button class="hud-btn" onclick="closeMenus()">LEAVE SHOP</button>
-            </div>
-
-            <div id="skill-menu" class="menu">
-                <h1 style="color:#00ffcc">📚 TRAINER</h1>
-                <p style="margin-bottom:12px;color:#888;font-size:12px">
-                    Use the side panel → to upgrade skills with Skill Tokens
-                </p>
-                <button class="hud-btn" onclick="closeMenus()">CLOSE</button>
-            </div>
-
-            <div id="stat-menu" class="menu">
-                <h1 style="color:#ff00ff">🪞 STAT MIRROR</h1>
-                <p style="margin-bottom:12px;color:#888;font-size:12px">
-                    Use the side panel → to allocate Stat Points
-                </p>
-                <button class="hud-btn" onclick="closeMenus()">CLOSE</button>
-            </div>
+  </div>
+  <div id="storeOverlay">
+    <div id="storeSheet">
+      <div id="storeHeader">
+        <span>🏪 Store &amp; Upgrades</span>
+        <div id="storeHeaderBtns">
+          <button id="storeCloseBtn">Close</button>
         </div>
-
-        <canvas id="gameCanvas"></canvas>
+      </div>
+      <div id="storeTabs">
+        <button id="storeTabBtn" class="storeTabBtn active">🛒 Store</button>
+        <button id="upgradeTabBtn" class="storeTabBtn">⚙️ Upgrades</button>
+      </div>
+      <div id="upgradeList"></div>
     </div>
+  </div>
 
-    <!-- Stats Panel -->
-    <div id="stats-panel">
-        <div class="panel-section">
-            <h3>CHARACTER</h3>
-            <div id="panel-char-info" style="font-size:12px;color:#ccc;line-height:1.8"></div>
-        </div>
-
-        <div class="panel-section">
-            <h3>STATS <span id="panel-stat-points" style="color:#ffcc00"></span></h3>
-            <div id="panel-stats-rows"></div>
-        </div>
-
-        <div class="panel-section">
-            <h3>SKILLS <span id="panel-skill-tokens" style="color:#00ffcc"></span></h3>
-            <div id="panel-skills-rows"></div>
-        </div>
+  <div id="resetConfirmOverlay">
+    <div id="resetConfirmSheet">
+      <div class="sellHeader">Reset all progress? This can't be undone.</div>
+      <button id="resetYesBtn" class="sellOptionBtn">🗑️ Yes, reset everything</button>
+      <button id="resetNoBtn" class="sellCancelBtn">No, keep playing</button>
     </div>
+  </div>
 
-    <!-- Panel toggle button -->
-    <button id="panel-toggle" onclick="togglePanel()">STATS ▸</button>
 </div>
 
-<script>
-// ════════════════════════════════════════
-//  SPLASH SCREEN LOGIC
-// ════════════════════════════════════════
+<div id="splashOverlay" class="splashOverlay">
+  <div id="splashCard">
+    <div id="splashTitle">Color Gather</div>
+    <div id="splashStory">
+      Sad news: your eccentric uncle has passed away.<br><br>
+      Stranger news: he's left you his old art studio — and there's something magical about the paint inside.<br><br>
+      Time to see what you can make of it.
+    </div>
+    <button id="splashStartBtn">🎨 Start Painting</button>
+  </div>
+</div>
 
-const CLASS_META = {
-    fire:   { emoji:'🧙', name:'PYRO',  desc:'Glass cannon. High damage, low survivability.', stats:{STR:3,DEX:2,CON:0,INT:4,WIS:1}, skills:['🔥 Fire Burst','💨 Flame Dash','🛡️ Molten Guard','☄️ Inferno'] },
-    blood:  { emoji:'🧛', name:'BLOOD', desc:'Sustain fighter. Lifesteal and high HP.',        stats:{STR:2,DEX:1,CON:4,INT:1,WIS:2}, skills:['🩸 Blood Drain','🦇 Bat Swarm','❤️ Blood Pact','💉 Hemorrhage'] },
-    plague: { emoji:'🧟', name:'ROT',   desc:'DoT specialist. Slow but devastating.',          stats:{STR:1,DEX:0,CON:2,INT:5,WIS:2}, skills:['☠️ Poison Cloud','🕸️ Web Trap','🧟 Reanimate','🌑 Plague Nova'] },
-};
-
-const STAT_MAX = { fire:{STR:10,DEX:8,CON:5,INT:15,WIS:8}, blood:{STR:8,DEX:6,CON:15,INT:5,WIS:8}, plague:{STR:6,DEX:5,CON:8,INT:15,WIS:10} };
-
-let selectedClass = null;
-
-function showTab(id) {
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    const idx = ['tab-instructions','tab-select','tab-continue'].indexOf(id);
-    document.querySelectorAll('.tab-btn')[idx]?.classList.add('active');
-}
-
-function buildClassGrid() {
-    const grid = document.getElementById('class-grid');
-    grid.innerHTML = '';
-    for (const [type, meta] of Object.entries(CLASS_META)) {
-        const card = document.createElement('div');
-        card.className = 'class-card';
-        card.innerHTML = `
-            <span class="emoji">${meta.emoji}</span>
-            <span class="cname">${meta.name}</span>
-            <span class="cdesc">${meta.desc}</span>`;
-        card.onclick = () => selectClass(type);
-        grid.appendChild(card);
-    }
-}
-
-function selectClass(type) {
-    selectedClass = type;
-    document.querySelectorAll('.class-card').forEach((c,i) => {
-        c.classList.toggle('selected', Object.keys(CLASS_META)[i] === type);
-    });
-
-    const meta = CLASS_META[type];
-    const maxes = STAT_MAX[type];
-    const preview = document.getElementById('class-stats-preview');
-    preview.classList.add('visible');
-    document.getElementById('preview-name').textContent = `${meta.emoji} ${meta.name}`;
-
-    const statsDiv = document.getElementById('preview-stats');
-    statsDiv.innerHTML = Object.entries(meta.stats).map(([k,v]) => `
-        <div class="stat-row">
-            <span class="stat-label">${k}</span>
-            <div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${(v/maxes[k])*100}%"></div></div>
-            <span class="stat-val">${v}</span>
-        </div>`).join('');
-
-    document.getElementById('preview-skills').innerHTML =
-        '<strong style="color:#00ffcc;display:block;margin-bottom:4px">SKILLS</strong>' +
-        meta.skills.join('&nbsp;&nbsp;');
-
-    const btn = document.getElementById('play-btn');
-    btn.disabled = false;
-    btn.textContent = `▶ PLAY AS ${meta.name}`;
-}
-
-function checkSave() {
-    const json = localStorage.getItem('spire_save');
-    if (!json) return;
-    const data = JSON.parse(json);
-    document.getElementById('continue-tab-btn').style.display = 'flex';
-
-    const el = CLASS_META[data.element] || CLASS_META.fire;
-    document.getElementById('save-summary').innerHTML = `
-        <div style="font-size:28px;margin-bottom:8px">${el.emoji}</div>
-        <div style="color:#ffcc00">${el.name} — Level ${data.level || 1}</div>
-        <div style="color:#888;font-size:11px">XP: ${data.xp || 0} / ${data.xpToNext || 100}</div>
-        <div style="color:#888;font-size:11px">Gold: ${data.gold || 0}</div>
-        <div style="color:#888;font-size:11px">Stat Points: ${data.statPoints || 0} &nbsp; Skill Tokens: ${data.skillTokens || 0}</div>
-    `;
-}
-function startNewGame() {
-    if (!selectedClass) return;
-    window._startClass = selectedClass;
-    window._continueGame = false;
-    const nameInput = document.getElementById('hero-name-input');
-    window._heroName = (nameInput?.value.trim() || 'HERO').toUpperCase().slice(0,8);
-    document.getElementById('splash').style.display = 'none';
-    document.getElementById('game-layout').style.display = 'block';
-    requestAnimationFrame(() => {
-        resizeCanvas();
-        window._gameReady = true;
-    });
-}
-
-function continueGame() {
-    window._continueGame = true;
-    document.getElementById('splash').style.display = 'none';
-    document.getElementById('game-layout').style.display = 'block';
-    requestAnimationFrame(() => {
-        resizeCanvas();
-        window._gameReady = true;
-    });
-}
-
-function deleteSave() {
-    if (confirm('Delete save and start over?')) {
-        localStorage.removeItem('spire_save');
-        location.reload();
-    }
-}
-
-// ════════════════════════════════════════
-//  PANEL LOGIC
-// ════════════════════════════════════════
-let panelOpen = false;
-
-function togglePanel() {
-    panelOpen = !panelOpen;
-    const panel  = document.getElementById('stats-panel');
-    const toggle = document.getElementById('panel-toggle');
-    const layout = document.getElementById('game-layout');
-
-    panel.classList.toggle('open', panelOpen);
-    toggle.classList.toggle('open', panelOpen);
-    layout.classList.toggle('panel-open', panelOpen);
-    toggle.textContent = panelOpen ? 'STATS ◂' : 'STATS ▸';
-
-    // Wait for CSS transition to finish before resizing canvas
-    setTimeout(resizeCanvas, 260);
-}
-
-function resizeCanvas() {
-    const canvas = document.getElementById('gameCanvas');
-    const wrap = document.getElementById('canvas-wrap');
-    if (!canvas) return;
-    canvas.width  = wrap.offsetWidth;
-    canvas.height = wrap.offsetHeight;
-}
-
-// ════════════════════════════════════════
-//  PANEL UI UPDATE (called from game.js)
-// ════════════════════════════════════════
-window.updatePanel = function(player) {
-    if (!player) return;
-
-    // Character info
-    document.getElementById('panel-char-info').innerHTML = `
-        <div style="font-size:24px">${player.avatar}</div>
-        <div style="color:#ffcc00">${player.className}</div>
-        <div>Level ${player.level}</div>
-        <div style="color:#888;font-size:10px">XP ${player.xp} / ${player.xpToNext}</div>
-        <div style="color:#888;font-size:10px">Gold 💰 ${player.gold}</div>
-    `;
-
-    // Stat points
-    document.getElementById('panel-stat-points').textContent =
-        player.statPoints > 0 ? `(${player.statPoints} pts)` : '';
-
-    const statLabels = { str:'STR', dex:'DEX', con:'CON', int:'INT', wis:'WIS' };
-    const statColors = { str:'#ff6644', dex:'#ffcc00', con:'#ff4488', int:'#aa44ff', wis:'#44aaff' };
-
-    document.getElementById('panel-stats-rows').innerHTML =
-        Object.entries(player.stats).map(([k, v]) => {
-            const max = player.statMax[k] || 10;
-            const canUp = player.statPoints > 0 && v < max;
-            return `
-            <div class="panel-stat-row">
-                <span class="panel-stat-label">${statLabels[k]}</span>
-                <div class="panel-stat-bar">
-                    <div class="panel-stat-fill" style="width:${(v/max)*100}%;background:${statColors[k]}"></div>
-                </div>
-                <span class="panel-stat-val">${v}</span>
-                <button class="panel-plus-btn" ${canUp?'':'disabled'} onclick="window.panelUpgradeStat('${k}')">+</button>
-            </div>`;
-        }).join('');
-
-    // Skill tokens
-    document.getElementById('panel-skill-tokens').textContent =
-        player.skillTokens > 0 ? `(${player.skillTokens} tokens)` : '';
-
-    // Skills
-    document.getElementById('panel-skills-rows').innerHTML =
-        Object.entries(player.skills).map(([key, skill]) => {
-            const unlocked = skill.tier > 0;
-            const maxed    = skill.tier >= skill.maxTier;
-            const canUp    = player.skillTokens > 0 && !maxed;
-            const tierLabel = maxed ? 'MAX' : unlocked ? `Tier ${skill.tier}` : 'Locked';
-            const pips = Array.from({length: skill.maxTier}, (_,i) =>
-                `<div class="pip ${i < skill.tier ? 'filled' : ''}"></div>`).join('');
-
-            return `
-            <div class="skill-panel-row ${unlocked?'unlocked':''} ${maxed?'maxed':''}">
-                <div class="skill-panel-header">
-                    <span class="skill-icon">${skill.icon}</span>
-                    <span class="skill-name">${skill.name}</span>
-                    <span class="skill-tier-label">${tierLabel}</span>
-                </div>
-                <div class="skill-desc">${skill.description}</div>
-                <div class="tier-pips">${pips}</div>
-                <button class="skill-upgrade-btn" style="margin-top:6px"
-                    ${canUp?'':'disabled'}
-                    onclick="window.panelUpgradeSkill('${key}')">
-                    ${maxed ? '★ MAXED' : canUp ? '▲ UPGRADE (1 token)' : unlocked ? 'Need token' : '🔒 Need token'}
-                </button>
-            </div>`;
-        }).join('');
-};
-
-// ════════════════════════════════════════
-//  INIT
-// ════════════════════════════════════════
-buildClassGrid();
-checkSave();
-window.addEventListener('resize', resizeCanvas);
-</script>
-
-<!-- Eruda debug console (remove when done) -->
-<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
-
-<script type="module" src="game.js"></script>
+<script src="state.js"></script>
+<script src="colors.js"></script>
+<script src="processes.js"></script>
+<script src="store.js"></script>
+<script src="field.js"></script>
+<script src="minions.js"></script>
+<script src="dom.js"></script>
+<script src="effects.js"></script>
+<script src="inventory.js"></script>
+<script src="dropper.js"></script>
+<script src="sell.js"></script>
+<script src="orders.js"></script>
+<script src="journal-ui.js"></script>
+<script src="store-ui.js"></script>
+<script src="save.js"></script>
+<script src="main.js"></script>
 </body>
 </html>
