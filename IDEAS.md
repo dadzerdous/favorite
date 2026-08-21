@@ -2,7 +2,7 @@
 
 ## Build
 
-Current prototype: **v0.15.3**
+Current prototype: **v0.17.3**
 
 ## Current Direction
 
@@ -750,9 +750,218 @@ Fixed a regression introduced during the v0.15.1 cleanup:
 No gameplay/balance changes in this hotfix.
 
 
-## v0.15.3 — Raider Aim / Size Hotfix
+## v0.16 — Ranger Weapon + Route Pass
 
-- Raider Archer now aims at the trolley's current position when the telegraph completes.
-- Raider arrows use their own vx/vy trajectory instead of straight-down behavior.
-- Raider artwork now fits the same code-defined prison-block footprint as Grunts.
-- Source PNG dimensions can still differ; rendering normalizes them in code.
+### Ranger
+- First active class prototype is Ranger.
+- Tap/click a living mob to fire the Bow.
+- Bow arrow physically travels from the hero to the selected target.
+- 3 damage, 2-second cooldown, unlimited ammo for this prototype.
+- Enemy taps are consumed by the weapon so the same tap does not also steer/launch.
+- This is intentionally one class first; Mystic gravity and Paladin shield remain later tests.
+
+### Enemy Placement
+- Normal-room board geometry remains authored.
+- Existing mob positions act as enemy sockets.
+- Mob identities are shuffled among those sockets each run.
+- Room 5 boss placement remains fully hard-coded.
+
+### Route Choices
+- Shop is no longer an automatic every-third-room interruption.
+- Physical route doors can now offer Standard, Hard, Treasure, or Shop.
+- Shop does not increment the combat room by itself; leaving it advances to the next combat room.
+- Shop is excluded from the first route choice.
+- Hard currently adds +2 HP to alternating mobs as an initial threat-budget prototype.
+- Treasure retains the extra yellow-hued treasure-brick behavior.
+
+### v0.16 Compatibility Fix
+- Preserves/restores the Raider Archer aimed-arrow behavior: the Room 5 Raider aims at the trolley at release time instead of firing straight down.
+
+
+## v0.16.1 — Freeze / Damage Sources / Raider Visuals
+
+### Freeze Stacking
+- Ice slow stacks up to 3 times.
+- Each Ice hit refreshes the 3-second duration.
+- 1 stack = 75% movement speed.
+- 2 stacks = 58% movement speed.
+- 3 stacks = 40% movement speed.
+- Hero + trolley are tinted increasingly blue while frozen.
+- Freeze is capped so the player can never be slowed below 40%.
+
+### Separate Damage Sources
+Ball damage and class-weapon damage are now separate systems.
+
+**Ball damage can:**
+- use ball damage stats/equipment,
+- trigger Ember/Cinder,
+- exploit Ball elemental weaknesses,
+- trigger Fire splash,
+- build Ball combo XP,
+- use Ball piercing.
+
+**Ranger Bow weapon damage:**
+- deals its own direct weapon damage,
+- does not inherit ball Fire,
+- does not trigger Cinder/Ember splash,
+- does not use Ball piercing,
+- does not add Ball combo XP.
+
+Raider armor remains universal defense and can be damaged by either source.
+
+### Raider Visuals
+- Raider image is forced into the exact same gameplay cell dimensions as Grunt enemy blocks, regardless of source PNG dimensions or padding.
+- While Raider armor remains, a pulsing grey shield outline surrounds the block.
+- Shield disappears immediately when armor breaks.
+
+
+## v0.16.2 — Door Routing / Baseline Treasure / Grunt Art Width
+
+### Door Routing Fix
+- Left/right movement no longer implies Standard/Treasure.
+- Each physical doorway owns an explicit route type.
+- Crossing the left threshold commits `exitChoice.leftType`.
+- Crossing the right threshold commits `exitChoice.rightType`.
+- Legacy `battle` naming is normalized to `standard`.
+- Console now prints the actual selected route and room for easier testing.
+
+### Treasure Distribution
+Standard rooms now have baseline loot potential:
+- ~45% chance for 1 treasure brick.
+- Small additional chance for a second.
+
+Hard rooms:
+- ~30% chance for 1 treasure brick.
+
+Treasure routes:
+- 5–7 treasure bricks where enough normal environmental bricks exist.
+
+Treasure route is therefore a strong loot choice, not the only way treasure can ever appear.
+
+### Enemy Art Sizing
+- Grunt collision/gameplay cell is unchanged.
+- Grunt artwork is rendered about 16% wider inside the same cell so its visible prison-block frame better matches the Raider and environmental brick width.
+- Raider dimensions remain unchanged from v0.16.1 because its height/overall footprint looked correct.
+
+
+## v0.16.3 — Reusable Route Door Asset
+
+- Added `assets/door.png`.
+- All physical route doors use the same single image.
+- Standard keeps the original blue portal.
+- Hard, Treasure, and Shop are created with canvas hue/filter changes.
+- Route icon, label, and detail stay code-driven.
+- Door destination still comes from the doorway's assigned route type.
+
+
+## v0.16.4 — Generic Element Splash FX
+- Wired `assets/bg-ball.png` as the reusable impact/splash visual.
+- Fire splash now has a visible expanding effect at its origin.
+- Visual FX are separate from damage logic.
+- Same asset is ready to tint for Fire, Ice, Poison, and Arcane effects later.
+
+
+## v0.16.5 — Portal Visibility / Collision Face / Stun Grunt
+
+### Portal
+- Cropped `assets/door.png` down to its visible portal content so the actual doorway fills the draw rectangle.
+- Added a route-colored glow behind every portal, so doors remain visible even if the image is still loading.
+- Standard blue, Hard red, Treasure gold, Shop purple.
+
+### Block Collision Readability
+- Brick/mob collision faces are inset slightly from their full canvas cell.
+- This compensates for transparent art padding and lets the visible Ball reach the visible square before bouncing.
+- Piercing now only continues through a target when that target was actually destroyed and excess damage remains.
+
+### Stun Grunt
+- Added the first Stun enemy power.
+- Stun Grunt is a yellow/electric stationary Grunt.
+- Telegraphs before firing.
+- Stun projectile does not deal HP damage.
+- On hit, trolley control is disabled for 1.15 seconds while the Ball continues moving.
+- Player/trolley receive a bright electric/stunned tint during the effect.
+- Hard Room 4 now guarantees at least one active Stun threat instead of only adding Grey-Grunt HP.
+
+
+## v0.17 — Skill / Equipment / Rune Rules
+
+### Core Rule
+**Skill = active player action.**
+**Equipment = changes gameplay rules.**
+**Runes = temporary numeric/stat boosts during a run.**
+
+### Ranger Skill — Bow Shot
+- Bow Shot is a class skill, not a weapon/equipment item.
+- Tap/click a living enemy to use it.
+- 1 direct skill damage.
+- 5 second base cooldown.
+- Unlimited uses, gated by cooldown.
+- Does not inherit Ball Fire, Cinder, piercing, Ball combo XP, or other Ball effects.
+- Cooldown Runes can reduce the cooldown, capped at 45% reduction.
+
+### Equipment
+Equipment remains permanent and chosen between runs.
+It can create mechanics rather than only numbers.
+
+Examples:
+- Cinder Ball = Ball gains Fire/splash behavior.
+- Piercing Ball = excess Ball damage carries through destroyed targets.
+- Future shield gear = grants shield behavior.
+- Future boots = movement handling.
+- Future helmet/chest/ring/amulet/trolley = defensive, elemental, or utility mechanics.
+
+### Runes
+Runes are now run-only stat modifiers.
+
+Current Rune pool:
+- Power: +10% Ball damage.
+- Tempo: +8% Ball speed.
+- Drag: -8% Ball speed.
+- Agility: +10% trolley speed.
+- Expansion: +10% trolley width.
+- Vitality: +10% max HP.
+- Focus: -8% class-skill cooldown.
+- Mass: +8% Ball size.
+- Element: +12% elemental-effect strength.
+
+### Caps
+Physical/stat caps prevent runaway builds from breaking the game:
+- Ball damage multiplier: 2.5x.
+- Ball speed: 55% to 175% of base.
+- Trolley speed: max 175%.
+- Trolley width: max 160%.
+- Max HP from runes: max +100%.
+- Class-skill cooldown reduction: max 45%.
+- Ball size: max +50%.
+- Elemental-effect strength: max 2x.
+
+Some future runes can be equipment- or skill-specific instead of universal.
+
+
+## v0.17.1 — Startup Hotfix
+- Fixed Ranger Skill HUD DOM IDs after the Weapon → Skill rename.
+- The old JS selectors were returning `null`, causing the first animation frame to throw and making the game appear not to load.
+- Removed the leftover `runes.ward` reference from room-start armor.
+- Removed the leftover `runes.ember` reference from Ball rendering; Cinder Ball now owns the Fire Ball visual as intended.
+- No balance changes from v0.17.
+
+
+## v0.17.2 — Game Loop Scope Hotfix
+- Fixed malformed Stun movement patch that accidentally inserted player-stun logic inside `updateExitChoice()`.
+- The missing block closure caused `updatePlayer()` and subsequent declarations to be scoped inside the door function.
+- `gameLoop()` therefore threw `ReferenceError: updatePlayer is not defined`.
+- Rebuilt `updateExitChoice()`, `commitExitDoor()`, `chooseDungeonExit()`, and `updatePlayer()` as clean top-level functions.
+- Stun still disables trolley control while active.
+- Door movement remains independent of combat stun.
+- `favicon.ico` 404 is unrelated and harmless.
+
+
+## v0.17.3 — Fine-Tuning Pass
+- Freeze now tests 30% / 60% / 90% slow at stacks 1/2/3.
+- Freeze tint gets much stronger at each stack.
+- Rune rewards now roll exactly 3 random choices from the current pool.
+- Shop is removed from active route rolls for now; only Standard / Hard / Treasure appear.
+- After hopping off the trolley, route choice uses full 2D movement.
+- PC: WASD or arrows. Mobile: drag toward your destination.
+- Entering the actual portal area selects that route.
+- This movement is groundwork for a future interactive shopkeeper and walk-up items.

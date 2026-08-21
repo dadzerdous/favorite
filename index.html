@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Spike Trolley RPG v0.15.3</title>
+  <title>Spike Trolley RPG v0.17.3</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -19,10 +19,15 @@
 
       <div id="message">TAP / CLICK TO LAUNCH</div>
       <button id="glueButton" class="hidden">🧲 GLUE <span id="glueButtonCount">0</span></button>
+      <div id="weaponHud">
+        <span>🏹 RANGER SKILL</span>
+        <div class="weaponCooldown"><i id="skillCooldownFill"></i></div>
+        <small id="skillStatus">BOW SHOT READY — TAP ENEMY</small>
+      </div>
       <div id="bossHud" class="hidden"><span>🛡️ ARMORED RAIDER</span><div class="bossBar"><i id="bossBarFill"></i></div><small id="bossPhase">ARMORED</small></div>
       <div id="comboHud" class="hidden">COMBO <strong id="comboCount">x0</strong> <span id="comboXp">+0 XP</span></div>
       <div id="runeHud">RUNES: <span id="runeHudText">None</span></div>
-      <div id="versionBadge">v0.15.3</div>
+      <div id="versionBadge">v0.17.3</div>
       <div id="roomClearBanner" class="hidden">ROOM CLEARED</div>
       <div id="pathHint" class="hidden">ROOM CLEARED — WALK THROUGH A DOOR</div>
       <div id="mobileHint">Drag anywhere to steer • A/D or ←/→ on PC</div>
@@ -207,7 +212,7 @@
             <button class="upgradeCard shopCard" data-shop="overshield">
               <span class="upgradeIcon">💙</span>
               <strong>OVERSHIELD — 12 GOLD</strong>
-              <span>Blocks the first damage in every room.</span>
+              <span>Temporary run gear: blocks the first damage in every room.</span>
               <small id="shieldOwned">Not owned</small>
             </button>
 
@@ -245,39 +250,67 @@
           <p>Permanent for this run. Pick one to enter the next room.</p>
 
           <div class="upgradeChoices runeChoices">
-            <button class="upgradeCard" data-rune="ember">
-              <span class="upgradeIcon">🔥</span>
-              <strong>EMBER RUNE</strong>
-              <span>Ball gains Fire. Fire deals bonus damage to Ice and explodes into adjacent targets.</span>
-              <small id="emberLevel">Fire: inactive</small>
+            <button class="upgradeCard" data-rune="power">
+              <span class="upgradeIcon">💥</span>
+              <strong>POWER RUNE</strong>
+              <span>+10% Ball damage.</span>
+              <small id="powerRuneLevel">Ball damage: +0%</small>
             </button>
 
-            <button class="upgradeCard" data-rune="impact">
-              <span class="upgradeIcon">💥</span>
-              <strong>IMPACT RUNE</strong>
-              <span>+1 ball damage for this run.</span>
-              <small id="impactLevel">Bonus damage: +0</small>
+            <button class="upgradeCard" data-rune="tempo">
+              <span class="upgradeIcon">⚡</span>
+              <strong>TEMPO RUNE</strong>
+              <span>+8% Ball speed.</span>
+              <small id="tempoRuneLevel">Ball speed: +0%</small>
+            </button>
+
+            <button class="upgradeCard" data-rune="drag">
+              <span class="upgradeIcon">🐌</span>
+              <strong>DRAG RUNE</strong>
+              <span>-8% Ball speed for easier control.</span>
+              <small id="dragRuneLevel">Ball speed: -0%</small>
+            </button>
+
+            <button class="upgradeCard" data-rune="agility">
+              <span class="upgradeIcon">🏃</span>
+              <strong>AGILITY RUNE</strong>
+              <span>+10% trolley movement speed.</span>
+              <small id="agilityRuneLevel">Trolley speed: +0%</small>
             </button>
 
             <button class="upgradeCard" data-rune="expansion">
               <span class="upgradeIcon">↔️</span>
               <strong>EXPANSION RUNE</strong>
-              <span>+15% trolley width for this run.</span>
-              <small id="expansionLevel">Width bonus: 0%</small>
+              <span>+10% trolley width.</span>
+              <small id="expansionRuneLevel">Width: +0%</small>
             </button>
 
-            <button class="upgradeCard" data-rune="haste">
-              <span class="upgradeIcon">🏃</span>
-              <strong>HASTE RUNE</strong>
-              <span>+15% trolley speed for this run.</span>
-              <small id="hasteLevel">Speed bonus: 0%</small>
+            <button class="upgradeCard" data-rune="vitality">
+              <span class="upgradeIcon">❤️</span>
+              <strong>VITALITY RUNE</strong>
+              <span>+10% max HP.</span>
+              <small id="vitalityRuneLevel">Max HP: +0%</small>
             </button>
 
-            <button class="upgradeCard" data-rune="ward">
-              <span class="upgradeIcon">💙</span>
-              <strong>WARD RUNE</strong>
-              <span>Gain +1 temporary armor at the start of every room.</span>
-              <small id="wardLevel">Ward: +0</small>
+            <button class="upgradeCard" data-rune="cooldown">
+              <span class="upgradeIcon">⌛</span>
+              <strong>FOCUS RUNE</strong>
+              <span>-8% class-skill cooldown.</span>
+              <small id="cooldownRuneLevel">Skill cooldown: -0%</small>
+            </button>
+
+            <button class="upgradeCard" data-rune="ballSize">
+              <span class="upgradeIcon">⚪</span>
+              <strong>MASS RUNE</strong>
+              <span>+8% Ball size. Capped at +50%.</span>
+              <small id="ballSizeRuneLevel">Ball size: +0%</small>
+            </button>
+
+            <button class="upgradeCard" data-rune="elemental">
+              <span class="upgradeIcon">✨</span>
+              <strong>ELEMENT RUNE</strong>
+              <span>+12% elemental effect strength.</span>
+              <small id="elementalRuneLevel">Element strength: +0%</small>
             </button>
           </div>
         </div>

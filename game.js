@@ -45,6 +45,8 @@ const comboHudEl = document.getElementById("comboHud");
 const comboCountEl = document.getElementById("comboCount");
 const comboXpEl = document.getElementById("comboXp");
 const roomClearBannerEl = document.getElementById("roomClearBanner");
+const skillCooldownFillEl = document.getElementById("skillCooldownFill");
+const skillStatusEl = document.getElementById("skillStatus");
 const bossHudEl = document.getElementById("bossHud");
 const bossBarFillEl = document.getElementById("bossBarFill");
 const bossPhaseEl = document.getElementById("bossPhase");
@@ -60,11 +62,15 @@ const messageEl = document.getElementById("message");
 const upgradeOverlay = document.getElementById("upgradeOverlay");
 const shopOverlay = document.getElementById("shopOverlay");
 const runeHudTextEl = document.getElementById("runeHudText");
-const emberLevelEl = document.getElementById("emberLevel");
-const impactLevelEl = document.getElementById("impactLevel");
-const expansionLevelEl = document.getElementById("expansionLevel");
-const hasteLevelEl = document.getElementById("hasteLevel");
-const wardLevelEl = document.getElementById("wardLevel");
+const powerRuneLevelEl = document.getElementById("powerRuneLevel");
+const tempoRuneLevelEl = document.getElementById("tempoRuneLevel");
+const dragRuneLevelEl = document.getElementById("dragRuneLevel");
+const agilityRuneLevelEl = document.getElementById("agilityRuneLevel");
+const expansionRuneLevelEl = document.getElementById("expansionRuneLevel");
+const vitalityRuneLevelEl = document.getElementById("vitalityRuneLevel");
+const cooldownRuneLevelEl = document.getElementById("cooldownRuneLevel");
+const ballSizeRuneLevelEl = document.getElementById("ballSizeRuneLevel");
+const elementalRuneLevelEl = document.getElementById("elementalRuneLevel");
 
 const shieldOwnedEl = document.getElementById("shieldOwned");
 const glueCountEl = document.getElementById("glueCount");
@@ -93,6 +99,11 @@ const gobImage = new Image();
 gobImage.src = "assets/gob1.png";
 const raiderImage = new Image();
 raiderImage.src = "assets/mob-skel-arch.png";
+
+const doorImage = new Image();
+doorImage.src = "assets/door.png";
+const splashImage = new Image();
+splashImage.src = "assets/bg-ball.png";
 
 const brick1Image = new Image();
 brick1Image.src = "assets/brick1.png";
@@ -162,6 +173,7 @@ let lastTime = 0;
 let keys = {};
 let pointerActive = false;
 let pointerX = WORLD_WIDTH / 2;
+let pointerY = WORLD_HEIGHT / 2;
 let roomNumber = 1;
 
 let pendingRoomType = "battle";
@@ -175,18 +187,43 @@ const exitChoice = {
   heroX: WORLD_WIDTH / 2,
   heroY: 1110,
   speed: 390,
+  minX: 70,
+  maxX: WORLD_WIDTH - 70,
+  minY: 760,
+  maxY: 1135,
   facing: 1,
   hopTimer: 0,
-  chosen: null
+  chosen: null,
+  leftType: "battle",
+  rightType: "treasure"
 };
 
 let runes = {
-  ember: 0,
-  impact: 0,
-  expansion: 0,
-  haste: 0,
-  ward: 0
+  power: 0,       // +10% ball damage each
+  tempo: 0,       // +8% ball speed each
+  drag: 0,        // -8% ball speed each
+  agility: 0,     // +10% trolley speed each
+  expansion: 0,   // +10% trolley width each
+  vitality: 0,    // +10% max HP each
+  cooldown: 0,    // -8% class-skill cooldown each
+  ballSize: 0,    // +8% ball radius each
+  elemental: 0    // +12% elemental effect strength each
 };
+
+const runeCatalog = ["power","tempo","drag","agility","expansion","vitality","cooldown","ballSize","elemental"];
+let currentRuneOffer = [];
+function rollRuneOffer(count = 3) {
+  const pool = [...runeCatalog];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  currentRuneOffer = pool.slice(0, Math.min(count, pool.length));
+  document.querySelectorAll("[data-rune]").forEach(button => {
+    button.classList.toggle("hidden", !currentRuneOffer.includes(button.dataset.rune));
+  });
+}
+
 
 let gold = 0;
 
@@ -321,7 +358,7 @@ const equipmentCatalog = {
   ball:{
     iron:{name:"Iron Ball",effect:"Standard rebound."},
     piercing:{name:"Piercing Ball",effect:"Excess damage carries through destroyed blocks."},
-    cinder:{name:"Cinder Ball",effect:"Fire splash on every hit; also counts as Fire vs Ice."}
+    cinder:{name:"Cinder Ball",effect:"Adds Fire to Ball hits: splash damage and bonus vs Ice."}
   }
 };
 let patchBoughtThisVisit = false;
@@ -406,6 +443,7 @@ const player = {
   height: 44,
   baseSpeed: 620,
   speed: 620,
+  runSpeedMultiplier: 1,
   velocityX: 0,
   hp: 5,
   maxHp: 5,
@@ -413,12 +451,15 @@ const player = {
   facing: 1,
   runTimer: 0,
   slowTimer: 0,
-  slowMultiplier: 1
+  slowMultiplier: 1,
+  slowStacks: 0,
+  stunTimer: 0
 };
 
 const ball = {
   x: player.x,
   y: player.y - 60,
+  baseRadius: 16,
   radius: 16,
   speed: 620,
   vx: 0,
@@ -428,12 +469,23 @@ const ball = {
   baseDamageMultiplier: 1,
   equipmentSpeedMultiplier: 1,
   equipmentDamageMultiplier: 1,
+  runDamageMultiplier: 1,
+  runSpeedMultiplier: 1,
   pierceDamageRemaining: 0
 };
 
 let bricks = [];
 let enemyProjectiles = [];
+let playerProjectiles = [];
+
+const rangerSkill = {
+  cooldown: 5.0,
+  timer: 0,
+  damage: 1,
+  speed: 720
+};
 let particles = [];
+const splashEffects = [];
 let attackTimer = 0;
 let pendingShot = null;
 let roomClearTimer = 0;
@@ -530,6 +582,59 @@ const roomLayouts = [
   ]
 ];
 
+function shuffleEnemyPlacements() {
+  if (roomNumber === 5) return;
+
+  const mobs = bricks.filter(brick => brick.alive && brick.isMob);
+  const positions = mobs.map(brick => ({ x: brick.x, y: brick.y }));
+
+  for (let i = positions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [positions[i], positions[j]] = [positions[j], positions[i]];
+  }
+
+  mobs.forEach((brick, index) => {
+    brick.x = positions[index].x;
+    brick.y = positions[index].y;
+  });
+}
+
+function applyHardEnemyMix() {
+  if (roomNumber === 5 || currentRoomType !== "hard") return;
+
+  const mobs = bricks.filter(brick => brick.isMob);
+
+  // Hard rooms must contain an active threat, not only tougher Grey Grunts.
+  // Room 4 specifically introduces the Stun Grunt.
+  if (roomNumber >= 4 && mobs.length) {
+    const target = mobs[Math.floor(Math.random() * mobs.length)];
+
+    target.stunGoblin = true;
+    target.shooter = true;
+    target.shooterVariant = "stun";
+    target.fireGoblin = false;
+    target.darkFireGoblin = false;
+    target.iceGoblin = false;
+    target.greenGoblin = false;
+    target.hp = Math.max(target.hp, 4);
+    target.maxHp = Math.max(target.maxHp, 4);
+  }
+}
+
+function applyRouteThreat() {
+  if (roomNumber === 5 || currentRoomType !== "hard") return;
+
+  // Hard changes the encounter without simply doubling everything.
+  // Every other mob gains +2 HP for this first tuning pass.
+  const mobs = bricks.filter(brick => brick.isMob);
+  mobs.forEach((brick, index) => {
+    if (index % 2 === 0) {
+      brick.hp += 2;
+      brick.maxHp += 2;
+    }
+  });
+}
+
 function buildRoom() {
   bricks = [];
 
@@ -540,16 +645,49 @@ function buildRoom() {
 
   const workingLayout = layout.map(row => row.split(""));
 
-  if (currentRoomType === "treasure" && roomNumber !== 5) {
-    let converted = 0;
+  if (roomNumber !== 5) {
+    const availableBricks = [];
 
-    for (let r = 0; r < workingLayout.length && converted < 3; r++) {
-      for (let c = 0; c < workingLayout[r].length && converted < 3; c++) {
-        if (workingLayout[r][c] === "B") {
-          workingLayout[r][c] = "T";
-          converted += 1;
+    workingLayout.forEach((row, r) => {
+      row.forEach((cell, c) => {
+        if (cell === "B") {
+          availableBricks.push([r, c]);
         }
-      }
+      });
+    });
+
+    // Standard rooms can naturally contain a little treasure.
+    // Treasure routes intentionally contain a lot more.
+    let treasureCount = 0;
+
+    if (currentRoomType === "treasure") {
+      treasureCount = Math.min(
+        availableBricks.length,
+        5 + Math.floor(Math.random() * 3) // 5–7
+      );
+    } else if (
+      currentRoomType === "standard" ||
+      currentRoomType === "battle"
+    ) {
+      // About a 45% chance of one treasure brick,
+      // with a small chance for a second.
+      if (Math.random() < 0.45) treasureCount = 1;
+      if (treasureCount > 0 && Math.random() < 0.18) treasureCount += 1;
+    } else if (currentRoomType === "hard") {
+      // Hard is primarily about threat, but can still occasionally contain loot.
+      if (Math.random() < 0.30) treasureCount = 1;
+    }
+
+    // Shuffle eligible environmental-brick positions.
+    for (let i = availableBricks.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [availableBricks[i], availableBricks[j]] =
+        [availableBricks[j], availableBricks[i]];
+    }
+
+    for (let i = 0; i < treasureCount; i++) {
+      const [r, c] = availableBricks[i];
+      workingLayout[r][c] = "T";
     }
   }
 
@@ -592,6 +730,7 @@ function buildRoom() {
       let greenGoblin = false;
       let fireGoblin = false;
       let darkFireGoblin = false;
+      let stunGoblin = false;
       let raiderBoss = false;
 
       // Environment
@@ -642,6 +781,15 @@ function buildRoom() {
         darkFireGoblin = true;
       }
 
+      // Stun Grunt — stationary electric attacker.
+      if (type === "Z") {
+        hp = 4;
+        isMob = true;
+        shooter = true;
+        shooterVariant = "stun";
+        stunGoblin = true;
+      }
+
       // Armored Raider mini-boss
       if (type === "R") {
         hp = 28;
@@ -675,6 +823,7 @@ function buildRoom() {
         greenGoblin,
         fireGoblin,
         darkFireGoblin,
+        stunGoblin,
         raiderBoss,
 
         armor: raiderBoss ? 12 : 0,
@@ -694,8 +843,13 @@ function buildRoom() {
       ? "ROOM 5 — ARMORED RAIDER ARCHER"
       : currentRoomType === "treasure"
         ? `ROOM ${roomNumber} — TREASURE ROUTE`
-        : `ROOM ${roomNumber} — GOBLIN OUTPOST`;
+        : currentRoomType === "hard"
+          ? `ROOM ${roomNumber} — HARD ROUTE`
+          : `ROOM ${roomNumber} — STANDARD ROUTE`;
 
+  applyHardEnemyMix();
+  applyRouteThreat();
+  shuffleEnemyPlacements();
   updateHUD();
 
   const activeBoss =
@@ -741,11 +895,15 @@ function resetRun() {
   ballsLeft = maxBalls;
   resetHitCombo();
   runes = {
-    ember: 0,
-    impact: 0,
+    power: 0,
+    tempo: 0,
+    drag: 0,
+    agility: 0,
     expansion: 0,
-    haste: 0,
-    ward: 0
+    vitality: 0,
+    cooldown: 0,
+    ballSize: 0,
+    elemental: 0
   };
   hasOvershield = false;
   shieldReady = false;
@@ -760,10 +918,12 @@ function resetRun() {
   ball.damage = 1;
   applyPermanentStats();
   applyEquipment();
+  applyRunModifiers();
   player.hp = player.maxHp;
   player.x = WORLD_WIDTH / 2;
   player.slowTimer = 0;
   player.slowMultiplier = 1;
+  player.slowStacks = 0;
 
   ball.launched = false;
   ball.vx = 0;
@@ -783,6 +943,8 @@ function resetRun() {
 }
 
 function startRoom() {
+  playerProjectiles = [];
+  rangerSkill.timer = 0;
   resetHitCombo();
   exitChoice.active = false;
   exitChoice.chosen = null;
@@ -790,6 +952,7 @@ function startRoom() {
   player.x = WORLD_WIDTH / 2;
   player.slowTimer = 0;
   player.slowMultiplier = 1;
+  player.slowStacks = 0;
 
   ball.launched = false;
   ballStuck = false;
@@ -802,7 +965,7 @@ function startRoom() {
   enemyProjectiles = [];
   attackTimer = 0;
   shieldReady = hasOvershield;
-  armorPoints = progression.stats.defense + runes.ward;
+  armorPoints = progression.stats.defense;
 
   gameState = "waiting";
 
@@ -826,8 +989,8 @@ function launchBall() {
     ballStuck = false;
     stuckTimer = 0;
     const angle = -Math.PI / 3;
-    ball.vx = Math.cos(angle) * ball.speed * ball.equipmentSpeedMultiplier;
-    ball.vy = Math.sin(angle) * ball.speed * ball.equipmentSpeedMultiplier;
+    ball.vx = Math.cos(angle) * ball.speed * ball.equipmentSpeedMultiplier * ball.runSpeedMultiplier;
+    ball.vy = Math.sin(angle) * ball.speed * ball.equipmentSpeedMultiplier * ball.runSpeedMultiplier;
     ball.launched = true;
     ball.pierceDamageRemaining = 0;
     gameState = "playing";
@@ -841,8 +1004,8 @@ function launchBall() {
   ball.pierceDamageRemaining = 0;
 
   const angle = -Math.PI / 3;
-  ball.vx = Math.cos(angle) * ball.speed * ball.equipmentSpeedMultiplier;
-  ball.vy = Math.sin(angle) * ball.speed * ball.equipmentSpeedMultiplier;
+  ball.vx = Math.cos(angle) * ball.speed * ball.equipmentSpeedMultiplier * ball.runSpeedMultiplier;
+  ball.vy = Math.sin(angle) * ball.speed * ball.equipmentSpeedMultiplier * ball.runSpeedMultiplier;
 
   gameState = "playing";
   messageEl.style.display = "none";
@@ -869,6 +1032,18 @@ window.addEventListener("keyup", event => {
 canvas.addEventListener("pointerdown", event => {
   ensureBgMusic();
   if (gameState === "upgrade" || gameState === "shop" || gameState === "stats") return;
+
+  if (gameState === "playing") {
+    const rect = canvas.getBoundingClientRect();
+    const worldX = ((event.clientX - rect.left) / rect.width) * WORLD_WIDTH;
+    const worldY = ((event.clientY - rect.top) / rect.height) * WORLD_HEIGHT;
+    const tappedEnemy = enemyAtWorldPoint(worldX, worldY);
+
+    if (tappedEnemy && useRangerSkill(tappedEnemy)) {
+      event.preventDefault();
+      return;
+    }
+  }
 
   if (gameState === "exitChoice" || gameState === "roomClear") {
     pointerActive = true;
@@ -899,6 +1074,7 @@ window.addEventListener("pointerup", () => {
 function setPointerPosition(event) {
   const rect = canvas.getBoundingClientRect();
   pointerX = ((event.clientX - rect.left) / rect.width) * WORLD_WIDTH;
+  pointerY = ((event.clientY - rect.top) / rect.height) * WORLD_HEIGHT;
 }
 
 openProfilesButton.addEventListener("click", () => {
@@ -1149,24 +1325,12 @@ glueButton.addEventListener("click", armGlue);
 
 function chooseRune(type) {
   if (gameState !== "upgrade") return;
+  if (!(type in runes)) return;
+  if (!currentRuneOffer.includes(type)) return;
 
   runes[type] += 1;
 
-  if (type === "impact") {
-    ball.damage += 1;
-  }
-
-  if (type === "expansion") {
-    player.width *= 1.15;
-  }
-
-  if (type === "haste") {
-    player.speed *= 1.15;
-  }
-
-  if (type === "ward") {
-    armorPoints += 1;
-  }
+  applyRunModifiers();
 
   upgradeOverlay.classList.add("hidden");
   updateRuneText();
@@ -1179,26 +1343,112 @@ function chooseRune(type) {
 
 
 
+function applyRunModifiers() {
+  // Caps protect the physical game from runaway stacking.
+  const damageMult = Math.min(2.5, 1 + runes.power * 0.10);
+
+  const speedUp = runes.tempo * 0.08;
+  const speedDown = runes.drag * 0.08;
+  const ballSpeedMult = Math.max(0.55, Math.min(1.75, 1 + speedUp - speedDown));
+
+  const trolleySpeedMult = Math.min(1.75, 1 + runes.agility * 0.10);
+  const widthMult = Math.min(1.60, 1 + runes.expansion * 0.10);
+  const hpMult = Math.min(2.0, 1 + runes.vitality * 0.10);
+
+  const cooldownReduction = Math.min(0.45, runes.cooldown * 0.08);
+  const ballRadiusMult = Math.min(1.50, 1 + runes.ballSize * 0.08);
+
+  ball.runDamageMultiplier = damageMult;
+  ball.runSpeedMultiplier = ballSpeedMult;
+  ball.radius = Math.round(ball.baseRadius * ballRadiusMult);
+
+  player.runSpeedMultiplier = trolleySpeedMult;
+  player.width = Math.min(
+    player.baseWidth * 1.60,
+    player.baseWidth *
+      (1 + progression.stats.control * 0.03) *
+      widthMult
+  );
+
+  const permanentMaxHp = 5 + progression.stats.vitality;
+  const newMaxHp = Math.max(
+    permanentMaxHp,
+    Math.round(permanentMaxHp * hpMult)
+  );
+
+  const hpDelta = newMaxHp - player.maxHp;
+  player.maxHp = newMaxHp;
+  if (hpDelta > 0) player.hp += hpDelta;
+  player.hp = Math.min(player.hp, player.maxHp);
+
+  rangerSkill.effectiveCooldown =
+    rangerSkill.cooldown * (1 - cooldownReduction);
+}
+
+function elementalStrengthMultiplier() {
+  return Math.min(2.0, 1 + runes.elemental * 0.12);
+}
+
 function updateRuneText() {
-  if (emberLevelEl) {
-    emberLevelEl.textContent = runes.ember > 0
-      ? `Fire active${runes.ember > 1 ? ` — explosion +${runes.ember}` : ""}`
-      : "Fire: inactive";
+  if (powerRuneLevelEl) {
+    powerRuneLevelEl.textContent =
+      `Ball damage: +${Math.min(150, runes.power * 10)}%`;
   }
 
-  if (impactLevelEl) impactLevelEl.textContent = `Bonus damage: +${runes.impact}`;
-  if (expansionLevelEl) expansionLevelEl.textContent = `Width bonus: ${Math.round((Math.pow(1.15, runes.expansion) - 1) * 100)}%`;
-  if (hasteLevelEl) hasteLevelEl.textContent = `Speed bonus: ${Math.round((Math.pow(1.15, runes.haste) - 1) * 100)}%`;
-  if (wardLevelEl) wardLevelEl.textContent = `Ward: +${runes.ward}`;
+  if (tempoRuneLevelEl) {
+    tempoRuneLevelEl.textContent =
+      `Ball speed: +${Math.min(75, runes.tempo * 8)}%`;
+  }
+
+  if (dragRuneLevelEl) {
+    dragRuneLevelEl.textContent =
+      `Ball speed: -${Math.min(45, runes.drag * 8)}%`;
+  }
+
+  if (agilityRuneLevelEl) {
+    agilityRuneLevelEl.textContent =
+      `Trolley speed: +${Math.min(75, runes.agility * 10)}%`;
+  }
+
+  if (expansionRuneLevelEl) {
+    expansionRuneLevelEl.textContent =
+      `Width: +${Math.min(60, runes.expansion * 10)}%`;
+  }
+
+  if (vitalityRuneLevelEl) {
+    vitalityRuneLevelEl.textContent =
+      `Max HP: +${Math.min(100, runes.vitality * 10)}%`;
+  }
+
+  if (cooldownRuneLevelEl) {
+    cooldownRuneLevelEl.textContent =
+      `Skill cooldown: -${Math.min(45, runes.cooldown * 8)}%`;
+  }
+
+  if (ballSizeRuneLevelEl) {
+    ballSizeRuneLevelEl.textContent =
+      `Ball size: +${Math.min(50, runes.ballSize * 8)}%`;
+  }
+
+  if (elementalRuneLevelEl) {
+    elementalRuneLevelEl.textContent =
+      `Element strength: +${Math.min(100, runes.elemental * 12)}%`;
+  }
 
   const active = [];
-  if (runes.ember) active.push(`🔥${runes.ember}`);
-  if (runes.impact) active.push(`💥${runes.impact}`);
-  if (runes.expansion) active.push(`↔️${runes.expansion}`);
-  if (runes.haste) active.push(`🏃${runes.haste}`);
-  if (runes.ward) active.push(`💙${runes.ward}`);
 
-  runeHudTextEl.textContent = active.length ? active.join("  ") : "None";
+  if (runes.power) active.push(`💥${runes.power}`);
+  if (runes.tempo) active.push(`⚡${runes.tempo}`);
+  if (runes.drag) active.push(`🐌${runes.drag}`);
+  if (runes.agility) active.push(`🏃${runes.agility}`);
+  if (runes.expansion) active.push(`↔️${runes.expansion}`);
+  if (runes.vitality) active.push(`❤️${runes.vitality}`);
+  if (runes.cooldown) active.push(`⌛${runes.cooldown}`);
+  if (runes.ballSize) active.push(`⚪${runes.ballSize}`);
+  if (runes.elemental) active.push(`✨${runes.elemental}`);
+
+  runeHudTextEl.textContent =
+    active.length ? active.join("  ") : "None";
 }
 
 function openShop() {
@@ -1325,59 +1575,91 @@ function beginExitChoice() {
   exitChoice.facing = player.facing || 1;
   exitChoice.hopTimer = 0.45;
   exitChoice.chosen = null;
+
+  const routeSets = [
+    ["standard", "hard"],
+    ["standard", "treasure"],
+    ["hard", "treasure"]
+  ];
+  const pair = routeSets[Math.floor(Math.random() * routeSets.length)];
+  exitChoice.leftType = pair[0];
+  exitChoice.rightType = pair[1];
   pathHintEl.classList.remove("hidden");
 }
 
 function updateExitChoice(dt) {
   if (gameState !== "exitChoice") return;
-
-  let move = 0;
-
-  if (keys["arrowleft"] || keys["a"]) move -= 1;
-  if (keys["arrowright"] || keys["d"]) move += 1;
+  let moveX = 0, moveY = 0;
+  if (keys["arrowleft"] || keys["a"]) moveX -= 1;
+  if (keys["arrowright"] || keys["d"]) moveX += 1;
+  if (keys["arrowup"] || keys["w"]) moveY -= 1;
+  if (keys["arrowdown"] || keys["s"]) moveY += 1;
 
   if (pointerActive) {
-    const difference = pointerX - exitChoice.heroX;
-    if (Math.abs(difference) > 8) {
-      move = Math.max(-1, Math.min(1, difference / 90));
-    }
+    const dx = pointerX - exitChoice.heroX;
+    const dy = pointerY - exitChoice.heroY;
+    if (Math.abs(dx) > 10) moveX = Math.max(-1, Math.min(1, dx / 100));
+    if (Math.abs(dy) > 10) moveY = Math.max(-1, Math.min(1, dy / 100));
   }
+  if (moveX !== 0) exitChoice.facing = moveX > 0 ? 1 : -1;
+  if (exitChoice.hopTimer > 0) { exitChoice.hopTimer -= dt; return; }
+  const len = Math.hypot(moveX, moveY);
+  if (len > 1) { moveX /= len; moveY /= len; }
+  exitChoice.heroX += moveX * exitChoice.speed * dt;
+  exitChoice.heroY += moveY * exitChoice.speed * dt;
+  exitChoice.heroX = Math.max(exitChoice.minX, Math.min(exitChoice.maxX, exitChoice.heroX));
+  exitChoice.heroY = Math.max(exitChoice.minY, Math.min(exitChoice.maxY, exitChoice.heroY));
 
-  if (move !== 0) {
-    exitChoice.facing = move > 0 ? 1 : -1;
-  }
+  const doorY = 810, doorW = 205, doorH = 300, r = 28;
+  const lx = 35, rx = WORLD_WIDTH - 35 - doorW;
+  const inDoor = (x,y) => exitChoice.heroX + r > x && exitChoice.heroX - r < x + doorW && exitChoice.heroY + r > y && exitChoice.heroY - r < y + doorH;
+  if (inDoor(lx, doorY)) commitExitDoor("left");
+  else if (inDoor(rx, doorY)) commitExitDoor("right");
+}
 
-  if (exitChoice.hopTimer > 0) {
-    exitChoice.hopTimer -= dt;
+function commitExitDoor(side) {
+  if (gameState !== "exitChoice" || exitChoice.chosen) return;
+
+  const type =
+    side === "left"
+      ? exitChoice.leftType
+      : exitChoice.rightType;
+
+  if (!type) {
+    console.warn("Exit door had no assigned route type:", side);
     return;
   }
 
-  exitChoice.heroX += move * exitChoice.speed * dt;
-  exitChoice.heroX = Math.max(70, Math.min(WORLD_WIDTH - 70, exitChoice.heroX));
-
-  // Walking into either doorway commits the route.
-  if (exitChoice.heroX <= 125) {
-    chooseDungeonExit("battle");
-  } else if (exitChoice.heroX >= WORLD_WIDTH - 125) {
-    chooseDungeonExit("treasure");
-  }
+  chooseDungeonExit(type);
 }
 
 function chooseDungeonExit(type) {
   if (gameState !== "exitChoice" || exitChoice.chosen) return;
 
-  exitChoice.chosen = type;
-  pendingRoomType = type;
+  const normalizedType =
+    type === "battle"
+      ? "standard"
+      : type;
+
+  exitChoice.chosen = normalizedType;
   exitChoice.active = false;
   pathHintEl.classList.add("hidden");
 
-  if (roomNumber % 3 === 0) {
+  if (normalizedType === "shop") {
+    pendingRoomType = "standard";
     openShop();
-  } else {
-    roomNumber += 1;
-    currentRoomType = pendingRoomType;
-    startRoom();
+    return;
   }
+
+  pendingRoomType = normalizedType;
+  currentRoomType = normalizedType;
+  roomNumber += 1;
+
+  console.log(
+    `ENTERING ${normalizedType.toUpperCase()} ROUTE — ROOM ${roomNumber}`
+  );
+
+  startRoom();
 }
 
 function updatePlayer(dt) {
@@ -1388,42 +1670,87 @@ function updatePlayer(dt) {
 
   let move = 0;
 
-  if (keys["arrowleft"] || keys["a"]) move -= 1;
-  if (keys["arrowright"] || keys["d"]) move += 1;
+  if (player.stunTimer > 0) {
+    player.stunTimer = Math.max(0, player.stunTimer - dt);
+  }
 
-  if (pointerActive && gameState !== "upgrade" && gameState !== "shop") {
-    const difference = pointerX - player.x;
+  if (player.stunTimer <= 0) {
+    if (keys["arrowleft"] || keys["a"]) move -= 1;
+    if (keys["arrowright"] || keys["d"]) move += 1;
 
-    if (Math.abs(difference) > 10) {
-      move = Math.max(-1, Math.min(1, difference / 120));
+    if (
+      pointerActive &&
+      gameState !== "upgrade" &&
+      gameState !== "shop"
+    ) {
+      const difference = pointerX - player.x;
+
+      if (Math.abs(difference) > 10) {
+        move = Math.max(-1, Math.min(1, difference / 120));
+      }
     }
   }
 
   if (player.slowTimer > 0) {
     player.slowTimer -= dt;
-    player.slowMultiplier = 0.70;
+
+    const slowByStack = [1, 0.70, 0.40, 0.10];
+
+    player.slowMultiplier =
+      slowByStack[
+        Math.min(3, player.slowStacks || 0)
+      ];
+
+    if (player.slowTimer <= 0) {
+      player.slowStacks = 0;
+      player.slowMultiplier = 1;
+    }
   } else {
+    player.slowStacks = 0;
     player.slowMultiplier = 1;
   }
 
-  player.velocityX = move * player.speed * player.slowMultiplier;
+  player.velocityX =
+    move *
+    player.speed *
+    player.runSpeedMultiplier *
+    player.slowMultiplier;
+
   player.x += player.velocityX * dt;
 
   const halfWidth = player.width / 2;
-  player.x = Math.max(
-    halfWidth + 30,
-    Math.min(WORLD_WIDTH - halfWidth - 30, player.x)
-  );
+
+  player.x =
+    Math.max(
+      halfWidth + 30,
+      Math.min(
+        WORLD_WIDTH - halfWidth - 30,
+        player.x
+      )
+    );
 
   if (Math.abs(player.velocityX) > 5) {
-    player.facing = player.velocityX > 0 ? 1 : -1;
-    player.runTimer += dt * Math.abs(player.velocityX) / 80;
+    player.facing =
+      player.velocityX > 0 ? 1 : -1;
+
+    player.runTimer +=
+      dt *
+      Math.abs(player.velocityX) /
+      80;
   }
 
-  if (player.invincibleTimer > 0) player.invincibleTimer -= dt;
-  if (shieldShatterTimer > 0) shieldShatterTimer -= dt;
+  if (player.invincibleTimer > 0) {
+    player.invincibleTimer -= dt;
+  }
 
-  if ((!ball.launched && gameState === "waiting") || ballStuck) {
+  if (shieldShatterTimer > 0) {
+    shieldShatterTimer -= dt;
+  }
+
+  if (
+    (!ball.launched && gameState === "waiting") ||
+    ballStuck
+  ) {
     ball.x = player.x;
     ball.y = player.y - 58;
   }
@@ -1502,8 +1829,8 @@ function checkPaddleCollision() {
     const maxAngle = Math.PI * 0.38;
     const angle = relativeHit * maxAngle;
 
-    ball.vx = Math.sin(angle) * ball.speed * ball.equipmentSpeedMultiplier;
-    ball.vy = -Math.cos(angle) * ball.speed * ball.equipmentSpeedMultiplier;
+    ball.vx = Math.sin(angle) * ball.speed * ball.equipmentSpeedMultiplier * ball.runSpeedMultiplier;
+    ball.vy = -Math.cos(angle) * ball.speed * ball.equipmentSpeedMultiplier * ball.runSpeedMultiplier;
 
     playHitSound();
     createParticles(ball.x, ball.y, 8, "#f7d98a");
@@ -1514,11 +1841,21 @@ function checkBrickCollisions() {
   for (const brick of bricks) {
     if (!brick.alive) continue;
 
+    // Art contains a small amount of transparent padding. Use an inset
+    // collision face so the visible Ball actually reaches the visible block.
+    const insetX = Math.max(3, brick.width * 0.045);
+    const insetY = Math.max(2, brick.height * 0.055);
+
+    const left = brick.x + insetX;
+    const right = brick.x + brick.width - insetX;
+    const top = brick.y + insetY;
+    const bottom = brick.y + brick.height - insetY;
+
     if (
-      ball.x + ball.radius > brick.x &&
-      ball.x - ball.radius < brick.x + brick.width &&
-      ball.y + ball.radius > brick.y &&
-      ball.y - ball.radius < brick.y + brick.height
+      ball.x + ball.radius > left &&
+      ball.x - ball.radius < right &&
+      ball.y + ball.radius > top &&
+      ball.y - ball.radius < bottom
     ) {
       const equippedPiercing =
         progression.equipment.ball === "piercing";
@@ -1526,7 +1863,8 @@ function checkBrickCollisions() {
       const baseHitDamage =
         ball.damage *
         ball.baseDamageMultiplier *
-        ball.equipmentDamageMultiplier;
+        ball.equipmentDamageMultiplier *
+        ball.runDamageMultiplier;
 
       let damageToApply = baseHitDamage;
 
@@ -1538,16 +1876,28 @@ function checkBrickCollisions() {
         damageToApply = ball.pierceDamageRemaining;
       }
 
-      const hpBefore = brick.hp + (brick.raiderBoss ? brick.armor : 0);
+      const hpBefore =
+        brick.hp +
+        (brick.raiderBoss ? brick.armor : 0);
 
-      damageBrick(brick, damageToApply);
+      damageBrick(
+        brick,
+        damageToApply,
+        "ball"
+      );
 
       if (equippedPiercing) {
         ball.pierceDamageRemaining =
-          Math.max(0, damageToApply - hpBefore);
+          Math.max(
+            0,
+            damageToApply - hpBefore
+          );
 
-        if (ball.pierceDamageRemaining > 0) {
-          // Ball continues through this destroyed target.
+        if (
+          !brick.alive &&
+          ball.pierceDamageRemaining > 0
+        ) {
+          // Piercing only passes through a target that was actually destroyed.
           continue;
         }
 
@@ -1555,13 +1905,13 @@ function checkBrickCollisions() {
       }
 
       const overlapLeft =
-        ball.x + ball.radius - brick.x;
+        ball.x + ball.radius - left;
       const overlapRight =
-        brick.x + brick.width - (ball.x - ball.radius);
+        right - (ball.x - ball.radius);
       const overlapTop =
-        ball.y + ball.radius - brick.y;
+        ball.y + ball.radius - top;
       const overlapBottom =
-        brick.y + brick.height - (ball.y - ball.radius);
+        bottom - (ball.y - ball.radius);
 
       const minOverlap =
         Math.min(
@@ -1585,24 +1935,42 @@ function checkBrickCollisions() {
   }
 }
 
-function damageBrick(brick, overrideDamage = null) {
+function damageBrick(brick, overrideDamage = null, source = "ball") {
+  if (!brick || !brick.alive) return;
+
   playHitSound();
-  registerComboHit();
+
+  const isBallDamage = source === "ball";
+
+  // Ball combo XP is separate from class weapon damage.
+  if (isBallDamage) {
+    registerComboHit();
+  }
+
   let hitDamage =
     overrideDamage !== null
       ? overrideDamage
       : ball.damage *
         ball.baseDamageMultiplier *
-        ball.equipmentDamageMultiplier;
+        ball.equipmentDamageMultiplier *
+        ball.runDamageMultiplier;
 
-  if (brick.iceGoblin && (runes.ember > 0 || progression.equipment.ball === "cinder")) {
+  const ballHasFire =
+    isBallDamage &&
+    (
+      progression.equipment.ball === "cinder"
+    );
+
+  if (brick.iceGoblin && ballHasFire) {
     hitDamage *= 2;
   }
 
+  // Armor is universal defense; both Ball and weapon damage can break it.
   if (brick.raiderBoss && brick.armor > 0) {
     const absorbed = Math.min(brick.armor, hitDamage);
     brick.armor -= absorbed;
     hitDamage -= absorbed;
+
     createFloatingText(
       brick.x + brick.width / 2,
       brick.y - 8,
@@ -1612,6 +1980,7 @@ function damageBrick(brick, overrideDamage = null) {
 
     if (hitDamage <= 0) {
       brick.hitFlash = 0.12;
+      updateBossHUD(brick);
       return;
     }
   }
@@ -1619,10 +1988,8 @@ function damageBrick(brick, overrideDamage = null) {
   brick.hp -= hitDamage;
   brick.hitFlash = 0.12;
 
-  if (
-    runes.ember > 0 ||
-    progression.equipment.ball === "cinder"
-  ) {
+  // Ball-only elemental/equipment effects.
+  if (ballHasFire) {
     fireExplosion(
       brick.x + brick.width / 2,
       brick.y + brick.height / 2,
@@ -1674,12 +2041,31 @@ function damageBrick(brick, overrideDamage = null) {
     checkVictory();
   }
 
+  if (brick.raiderBoss) updateBossHUD(brick);
   updateHUD();
 }
 
+function createSplashEffect(x,y,element="fire",scale=1){
+  const filters={fire:"hue-rotate(0deg) saturate(1.7) brightness(1.2)",ice:"hue-rotate(155deg) saturate(1.5) brightness(1.2)",poison:"hue-rotate(75deg) saturate(1.8)",arcane:"hue-rotate(245deg) saturate(1.7)"};
+  splashEffects.push({x,y,age:0,duration:.28,scale,filter:filters[element]||filters.fire});
+}
+function updateSplashEffects(dt){
+  for(let i=splashEffects.length-1;i>=0;i--){splashEffects[i].age+=dt;if(splashEffects[i].age>=splashEffects[i].duration)splashEffects.splice(i,1);}
+}
+function drawSplashEffects(){
+  if(!splashImage.complete||!splashImage.naturalWidth)return;
+  for(const fx of splashEffects){
+    const t=fx.age/fx.duration,size=(50+105*(1-Math.pow(1-t,3)))*fx.scale;
+    ctx.save();ctx.globalAlpha=Math.max(0,1-t);ctx.filter=fx.filter;ctx.translate(fx.x,fx.y);ctx.rotate(t*.3);
+    ctx.drawImage(splashImage,-size/2,-size/2,size,size);ctx.restore();
+  }
+}
 function fireExplosion(x, y, sourceBrick) {
-  const radius = 155 + Math.max(0, runes.ember - 1) * 18;
-  const splashDamage = 0.75 + Math.max(0, runes.ember - 1) * 0.25;
+  createSplashEffect(x,y,"fire",1);
+
+  const elementMult = elementalStrengthMultiplier();
+  const radius = 155 * Math.min(1.5, elementMult);
+  const splashDamage = 0.75 * elementMult;
 
   createParticles(x, y, 28, "#ff7a35");
 
@@ -1796,6 +2182,122 @@ function updateBossHUD(boss) {
   }
 }
 
+function updateRangerSkill(dt) {
+  rangerSkill.timer = Math.max(0, rangerSkill.timer - dt);
+  const ready = rangerSkill.timer <= 0;
+  const activeCooldown = rangerSkill.effectiveCooldown || rangerSkill.cooldown;
+  const fill = 1 - rangerSkill.timer / activeCooldown;
+
+  if (skillCooldownFillEl) {
+    skillCooldownFillEl.style.width = `${Math.max(0, Math.min(1, fill)) * 100}%`;
+  }
+
+  if (skillStatusEl) {
+    skillStatusEl.textContent = ready
+      ? "BOW SHOT READY — TAP ENEMY"
+      : `BOW SHOT ${rangerSkill.timer.toFixed(1)}s`;
+  }
+}
+
+function enemyAtWorldPoint(x, y) {
+  for (let i = bricks.length - 1; i >= 0; i--) {
+    const enemy = bricks[i];
+    if (
+      enemy.alive &&
+      enemy.isMob &&
+      x >= enemy.x &&
+      x <= enemy.x + enemy.width &&
+      y >= enemy.y &&
+      y <= enemy.y + enemy.height
+    ) {
+      return enemy;
+    }
+  }
+  return null;
+}
+
+function useRangerSkill(target) {
+  if (
+    gameState !== "playing" ||
+    rangerSkill.timer > 0 ||
+    !target ||
+    !target.alive ||
+    !target.isMob
+  ) return false;
+
+  const x = player.x;
+  const y = player.y - 55;
+  const targetX = target.x + target.width / 2;
+  const targetY = target.y + target.height / 2;
+  const dx = targetX - x;
+  const dy = targetY - y;
+  const length = Math.hypot(dx, dy) || 1;
+
+  playerProjectiles.push({
+    x,
+    y,
+    vx: dx / length * rangerSkill.speed,
+    vy: dy / length * rangerSkill.speed,
+    radius: 8,
+    damage: rangerSkill.damage,
+    target
+  });
+
+  rangerSkill.timer = rangerSkill.effectiveCooldown || rangerSkill.cooldown;
+  return true;
+}
+
+function updatePlayerProjectiles(dt) {
+  for (let i = playerProjectiles.length - 1; i >= 0; i--) {
+    const shot = playerProjectiles[i];
+    shot.x += shot.vx * dt;
+    shot.y += shot.vy * dt;
+
+    const target = shot.target;
+    if (
+      target &&
+      target.alive &&
+      shot.x + shot.radius > target.x &&
+      shot.x - shot.radius < target.x + target.width &&
+      shot.y + shot.radius > target.y &&
+      shot.y - shot.radius < target.y + target.height
+    ) {
+      damageBrick(target, shot.damage, "weapon");
+      playerProjectiles.splice(i, 1);
+      continue;
+    }
+
+    if (
+      shot.x < -40 || shot.x > WORLD_WIDTH + 40 ||
+      shot.y < -40 || shot.y > WORLD_HEIGHT + 40
+    ) {
+      playerProjectiles.splice(i, 1);
+    }
+  }
+}
+
+function drawPlayerProjectiles() {
+  for (const shot of playerProjectiles) {
+    ctx.save();
+    ctx.translate(shot.x, shot.y);
+    ctx.rotate(Math.atan2(shot.vy, shot.vx));
+    ctx.strokeStyle = "#f2d7a0";
+    ctx.fillStyle = "#f2d7a0";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(-16, 0);
+    ctx.lineTo(13, 0);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(15, 0);
+    ctx.lineTo(6, -6);
+    ctx.lineTo(6, 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
 function updateEnemyAttacks(dt) {
   if (gameState !== "playing") return;
 
@@ -1814,6 +2316,8 @@ function updateEnemyAttacks(dt) {
 
         if (enemy.raiderBoss) {
           enemy.fireCooldown = enemy.armor > 0 ? 2.25 : 1.55;
+        } else if (enemy.shooterVariant === "stun") {
+          enemy.fireCooldown = 3.0;
         } else if (enemy.shooterVariant === "spread") {
           enemy.fireCooldown = 1.35;
         } else if (enemy.iceGoblin) {
@@ -1829,6 +2333,8 @@ function updateEnemyAttacks(dt) {
     if (enemy.fireCooldown <= 0) {
       if (enemy.raiderBoss) {
         enemy.fireCharge = 0.75;
+      } else if (enemy.shooterVariant === "stun") {
+        enemy.fireCharge = 0.8;
       } else if (enemy.shooterVariant === "spread") {
         enemy.fireCharge = 0.42;
       } else {
@@ -1844,61 +2350,48 @@ function fireEnemyShot(shooter) {
   const y = shooter.y + shooter.height;
 
   if (shooter.raiderBoss) {
-    // Raider archer aims at the trolley's CURRENT position when the arrow releases.
     const targetX = player.x;
     const targetY = player.y - 20;
-
     const dx = targetX - x;
     const dy = targetY - y;
     const length = Math.hypot(dx, dy) || 1;
-
-    const speed =
-      shooter.armor > 0
-        ? 360
-        : 430;
-
-    const vx = (dx / length) * speed;
-    const vy = (dy / length) * speed;
+    const speed = shooter.armor > 0 ? 360 : 430;
+    const vx = dx / length * speed;
+    const vy = dy / length * speed;
 
     enemyProjectiles.push({
-      x,
-      y,
-      radius: 11,
-      vx,
-      vy,
+      x, y, radius: 11, vx, vy,
       type: "arrow",
       angle: Math.atan2(vy, vx)
     });
-
     return;
   }
 
-  const isIce = shooter.iceGoblin;
-  const darkRed = shooter.shooterVariant === "spread";
+  if (shooter.iceGoblin) {
+    enemyProjectiles.push({x,y,radius:15,vx:0,vy:320,type:"ice"});
+    return;
+  }
 
-  if (darkRed) {
-    for (const vx of [-125, 0, 125]) {
-      enemyProjectiles.push({
-        x,
-        y,
-        radius: 13,
-        vx,
-        vy: 390,
-        type: "damage"
-      });
+  if (shooter.shooterVariant === "stun") {
+    enemyProjectiles.push({
+      x,
+      y,
+      radius: 14,
+      vx: 0,
+      vy: 355,
+      type: "stun"
+    });
+    return;
+  }
+
+  if (shooter.shooterVariant === "spread") {
+    for (const vx of [-150, 0, 150]) {
+      enemyProjectiles.push({x,y,radius:12,vx,vy:350,type:"damage"});
     }
-
     return;
   }
 
-  enemyProjectiles.push({
-    x,
-    y,
-    radius: isIce ? 15 : 13,
-    vx: 0,
-    vy: isIce ? 320 : 380,
-    type: isIce ? "ice" : "damage"
-  });
+  enemyProjectiles.push({x,y,radius:13,vx:0,vy:380,type:"damage"});
 }
 
 function updateProjectiles(dt) {
@@ -1916,6 +2409,8 @@ function updateProjectiles(dt) {
       enemyProjectiles.splice(i, 1);
       if (shot.type === "ice") {
         applyIceSlow();
+      } else if (shot.type === "stun") {
+        applyStun();
       } else {
         hurtPlayer();
       }
@@ -1955,10 +2450,39 @@ function loseBall() {
 }
 
 function applyIceSlow() {
-  player.slowTimer = Math.max(player.slowTimer, 3);
-  player.slowMultiplier = 0.70;
+  // Stack Ice up to three times; each hit refreshes the duration.
+  player.slowStacks = Math.min(3, (player.slowStacks || 0) + 1);
+  player.slowTimer = 3;
+
+  const slowByStack = [1, 0.70, 0.40, 0.10];
+  player.slowMultiplier = slowByStack[player.slowStacks];
+
   createParticles(player.x, player.y, 28, "#9de7ff");
-  createFloatingText(player.x, player.y - 45, "SLOWED!", "#bceeff");
+  createFloatingText(
+    player.x,
+    player.y - 45,
+    player.slowStacks > 1 ? `FROZEN x${player.slowStacks}!` : "SLOWED!",
+    "#bceeff"
+  );
+}
+
+function applyStun() {
+  // Briefly removes trolley control while the ball keeps moving.
+  player.stunTimer = Math.max(player.stunTimer || 0, 1.15);
+
+  createParticles(
+    player.x,
+    player.y - 20,
+    30,
+    "#ffe66d"
+  );
+
+  createFloatingText(
+    player.x,
+    player.y - 55,
+    "STUNNED!",
+    "#fff08a"
+  );
 }
 
 function hurtPlayer() {
@@ -2038,6 +2562,7 @@ function checkVictory() {
     messageEl.style.display = "none";
 
     updateRuneText();
+    rollRuneOffer(3);
 
     upgradeOverlay.classList.add("rewardRise");
     upgradeOverlay.classList.remove("hidden");
@@ -2190,22 +2715,79 @@ function drawBackground() {
   ctx.fillRect(WORLD_WIDTH - 28, 110, 28, WORLD_HEIGHT);
 }
 
+function routeDoorInfo(type) {
+  if (type === "hard") {
+    return {
+      icon: "🔥",
+      label: "HARD",
+      filter: "hue-rotate(135deg) saturate(1.65) brightness(.92)",
+      detail: "TOUGHER ENEMIES"
+    };
+  }
+
+  if (type === "treasure") {
+    return {
+      icon: "💰",
+      label: "TREASURE",
+      filter: "hue-rotate(205deg) saturate(1.7) brightness(1.08)",
+      detail: "MORE TREASURE"
+    };
+  }
+
+  if (type === "shop") {
+    return {
+      icon: "🛒",
+      label: "SHOP",
+      filter: "hue-rotate(70deg) saturate(1.55) brightness(.95)",
+      detail: "SPEND GOLD"
+    };
+  }
+
+  return {
+    icon: "⚔️",
+    label: "STANDARD",
+    filter: "none",
+    detail: "STANDARD ROOM"
+  };
+}
+
 function drawExitChoice() {
   if (gameState !== "exitChoice") return;
 
-  // Dim combat field.
   ctx.fillStyle = "rgba(7, 7, 10, .42)";
   ctx.fillRect(0, 110, WORLD_WIDTH, 1040);
 
-  const doorY = 870;
-  const doorW = 170;
-  const doorH = 260;
+  const doorY = 810;
+  const doorW = 205;
+  const doorH = 300;
 
-  drawDoor(45, doorY, doorW, doorH, "⚔️", "BATTLE", "#9f8355");
-  drawDoor(WORLD_WIDTH - 45 - doorW, doorY, doorW, doorH, "💰", "TREASURE", "#c6a23b");
+  const left = routeDoorInfo(exitChoice.leftType);
+  const right = routeDoorInfo(exitChoice.rightType);
 
-  // Tiny hop-off arc for the first fraction of a second.
+  drawDoor(
+    35,
+    doorY,
+    doorW,
+    doorH,
+    left.icon,
+    left.label,
+    left.filter,
+    left.detail
+  );
+
+  drawDoor(
+    WORLD_WIDTH - 35 - doorW,
+    doorY,
+    doorW,
+    doorH,
+    right.icon,
+    right.label,
+    right.filter,
+    right.detail
+  );
+
   let heroY = exitChoice.heroY;
+
   if (exitChoice.hopTimer > 0) {
     const t = 1 - exitChoice.hopTimer / 0.45;
     heroY -= Math.sin(t * Math.PI) * 55;
@@ -2219,37 +2801,49 @@ function drawExitChoice() {
   );
 }
 
-function drawDoor(x, y, w, h, icon, label, accent) {
+function drawDoor(x, y, w, h, icon, label, filter, detail = "") {
   ctx.save();
 
-  ctx.fillStyle = "#151219";
-  ctx.fillRect(x, y, w, h);
+  // Route glow remains visible even if the PNG fails to load.
+  ctx.globalAlpha = 0.40;
+  ctx.fillStyle =
+    label === "HARD" ? "#c43d34" :
+    label === "TREASURE" ? "#d2a933" :
+    label === "SHOP" ? "#8c55cc" :
+    "#3c91d1";
 
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 8;
-  ctx.strokeRect(x, y, w, h);
+  ctx.shadowBlur = 30;
+  ctx.shadowColor = ctx.fillStyle;
+  ctx.fillRect(x + 22, y + 22, w - 44, h - 38);
 
-  ctx.fillStyle = "rgba(0,0,0,.35)";
-  ctx.fillRect(x + 14, y + 14, w - 28, h - 28);
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
 
-  ctx.font = "bold 54px Arial";
+  if (doorImage.complete && doorImage.naturalWidth > 0) {
+    ctx.filter = filter || "none";
+    ctx.drawImage(doorImage, x, y, w, h);
+    ctx.filter = "none";
+  } else {
+    ctx.strokeStyle = "#ddd";
+    ctx.lineWidth = 7;
+    ctx.strokeRect(x, y, w, h);
+  }
+
   ctx.textAlign = "center";
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(icon, x + w / 2, y + 95);
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = "#000";
 
-  ctx.font = "bold 22px Arial";
-  ctx.fillStyle = "#f0e6c8";
-  ctx.fillText(label, x + w / 2, y + 150);
+  ctx.font = "bold 30px Arial";
+  ctx.fillStyle = "#fff";
+  ctx.fillText(icon, x + w / 2, y + h - 73);
 
-  ctx.font = "bold 13px Arial";
-  ctx.fillStyle = "#b9afbd";
-  ctx.fillText(
-    label === "BATTLE" ? "STANDARD ROOM" : "MORE TREASURE",
-    x + w / 2,
-    y + 178
-  );
+  ctx.font = "bold 20px Arial";
+  ctx.fillText(label, x + w / 2, y + h - 45);
 
-  ctx.textAlign = "start";
+  ctx.font = "bold 11px Arial";
+  ctx.fillStyle = "#eee5d4";
+  ctx.fillText(detail, x + w / 2, y + h - 25);
+
   ctx.restore();
 }
 
@@ -2302,6 +2896,20 @@ function drawPlayer() {
   }
 
   ctx.save();
+  if (player.slowTimer > 0 && player.slowStacks > 0) {
+    const tintByStack = [
+      "none",
+      "hue-rotate(145deg) saturate(1.7) brightness(1.18)",
+      "hue-rotate(155deg) saturate(2.3) brightness(1.30)",
+      "hue-rotate(165deg) saturate(3.0) brightness(1.48)"
+    ];
+    ctx.filter = tintByStack[Math.min(3, player.slowStacks)];
+  }
+
+  if (player.stunTimer > 0) {
+    ctx.filter = "sepia(.8) saturate(2.2) brightness(1.35)";
+  }
+
 
   if (
     player.invincibleTimer > 0 &&
@@ -2444,7 +3052,7 @@ function drawDriver(x, y) {
 }
 
 function drawBall() {
-  if (runes.ember > 0) {
+  if (progression.equipment.ball === "cinder") {
     ctx.save();
 
     const glow = ctx.createRadialGradient(
@@ -2541,6 +3149,8 @@ function drawBricks(dt) {
         ctx.filter = brick.armor > 0
           ? "grayscale(.45) brightness(.82) contrast(1.25)"
           : "none";
+      } else if (brick.stunGoblin) {
+        ctx.filter = "hue-rotate(48deg) saturate(2.1) brightness(1.2)";
       } else if (brick.darkFireGoblin) {
         ctx.filter = "hue-rotate(320deg) saturate(2) brightness(.66)";
       } else if (brick.fireGoblin || brick.shooter) {
@@ -2560,18 +3170,22 @@ function drawBricks(dt) {
       }
 
       if (brick.raiderBoss) {
-        drawMobImage(
-          raiderImage,
-          brick,
-          1.0,
-          1.20,
-          -3
-        );
+        // Raider has different source dimensions/padding; force exact cell size
+        // so its prison block matches every other enemy block.
+        if (raiderImage.complete && raiderImage.naturalWidth > 0) {
+          ctx.drawImage(
+            raiderImage,
+            brick.x,
+            brick.y - 3,
+            brick.width,
+            brick.height + 6
+          );
+        }
       } else {
         drawMobImage(
           gobImage,
           brick,
-          1.0,
+          1.16,
           1.20,
           -3
         );
@@ -2623,6 +3237,35 @@ function drawBricks(dt) {
       }
     }
 
+    if (brick.raiderBoss && brick.armor > 0) {
+      ctx.save();
+      const pulse = 0.78 + Math.sin(performance.now() * 0.006) * 0.10;
+
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = "#aeb4bb";
+      ctx.lineWidth = 7;
+      ctx.shadowBlur = 14;
+      ctx.shadowColor = "#9299a1";
+
+      ctx.strokeRect(
+        brick.x - 7,
+        brick.y - 9,
+        brick.width + 14,
+        brick.height + 18
+      );
+
+      ctx.globalAlpha = 0.09;
+      ctx.fillStyle = "#c5c9cd";
+      ctx.fillRect(
+        brick.x - 5,
+        brick.y - 7,
+        brick.width + 10,
+        brick.height + 14
+      );
+
+      ctx.restore();
+    }
+
     if (brick.maxHp > 1) {
       ctx.fillStyle = "#251d26";
       ctx.fillRect(
@@ -2669,7 +3312,12 @@ function drawProjectiles() {
       ctx.closePath();
       ctx.fill();
     } else {
-      ctx.fillStyle = shot.type === "ice" ? "#91e9ff" : "#ff5d4c";
+      ctx.fillStyle =
+        shot.type === "ice"
+          ? "#91e9ff"
+          : shot.type === "stun"
+            ? "#ffe15a"
+            : "#ff5d4c";
       ctx.shadowBlur = 14;
       ctx.shadowColor = ctx.fillStyle;
       ctx.beginPath();
@@ -2710,6 +3358,8 @@ function gameLoop(timestamp) {
   updateExitChoice(dt);
 
   if (gameState === "playing") {
+    updateRangerSkill(dt);
+    updatePlayerProjectiles(dt);
     updateBall(dt);
     updateBossMovement(dt);
     updateEnemyAttacks(dt);
@@ -2717,9 +3367,12 @@ function gameLoop(timestamp) {
   }
 
   updateParticles(dt);
+  updateSplashEffects(dt);
 
   drawBackground();
   drawBricks(dt);
+  drawSplashEffects();
+  drawPlayerProjectiles();
   drawProjectiles();
   drawRail();
   drawPlayer();
